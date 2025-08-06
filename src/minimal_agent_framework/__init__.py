@@ -1,3 +1,4 @@
-from .Graph import Graph
+from .graph import Graph
+from .node import Node
 
-__all__ = ['Graph']
+__all__ = ['graph', 'node']
