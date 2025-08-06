@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "minimal-agent-framework"
+version = "0.1.0"
+description = "A minimal framework for building agent-based applications."
+readme = "README.md"
+authors = [
+    { name = "Randy Herritt", email = "randy.herritt@gmail.com" }
+]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["agent", "framework", "multi-agent", "ai", "artificial intelligence"]
+
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/thepeacefulprogrammer/agent_framework"
+
+[tools.setuptools.packages.find]
+where = ["src"]
+
+[tools.setuptools.package-dir]
+"" = "src"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
