@@ -24,3 +24,9 @@ def test_add_node_to_graph():
     assert len(graph.nodes) == 1
     assert graph.nodes[0] is node
     assert isinstance(graph.nodes[0], Node)
+
+def test_graph_has_starting_node_attribute():
+    graph = Graph()
+    assert hasattr(graph, 'starting_node')
+    assert graph.starting_node is None
+    
