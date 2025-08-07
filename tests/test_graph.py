@@ -65,9 +65,27 @@ def test_graph_executes_next_node():
     mock_node_2._name = "node_2"
     mock_node_1.execute.return_value = "node_2"
     mock_node_2.execute.return_value = ""
-    
+
     graph.nodes.append(mock_node_1)
     graph.nodes.append(mock_node_2)
     graph.run(mock_node_1)
     mock_node_1.execute.assert_called_once()
     mock_node_2.execute.assert_called_once()
+
+def test_node_executes_pre_and_post_functions():
+
+    mock_pre = MagicMock()
+    mock_post = MagicMock()
+
+    graph = Graph()
+    node_1 = Node().name("node_1").routes([{"node_2": "default"}]).pre(mock_pre).post(mock_post)
+    node_2 = Node().name("node_2")
+
+
+    graph.nodes.append(node_1)
+    graph.nodes.append(node_2)
+    graph.run(node_1)
+
+    mock_pre.assert_called_once()
+    mock_post.assert_called_once()
+
