@@ -37,7 +37,7 @@ def test_starting_node_starts_with_graph_run():
     graph.run(mock_node)
     mock_node.execute.assert_called_once()
 
-def test_starting_node_failes_if_node_has_not_been_added():
+def test_starting_node_fails_if_node_has_not_been_added():
     graph = Graph()
     mock_node = MagicMock()
     other_node = MagicMock()
@@ -56,3 +56,18 @@ def test_running_node_returns_next_node_name_to_run():
     graph.nodes.append(node_2)
     graph.run(node_1)
     assert node_1.execute() == "node_2"
+
+def test_graph_executes_next_node():
+    graph = Graph()
+    mock_node_1 = MagicMock()
+    mock_node_2 = MagicMock()
+    mock_node_1._name = "node_1"
+    mock_node_2._name = "node_2"
+    mock_node_1.execute.return_value = "node_2"
+    mock_node_2.execute.return_value = ""
+    
+    graph.nodes.append(mock_node_1)
+    graph.nodes.append(mock_node_2)
+    graph.run(mock_node_1)
+    mock_node_1.execute.assert_called_once()
+    mock_node_2.execute.assert_called_once()

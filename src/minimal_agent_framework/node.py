@@ -1,3 +1,5 @@
+import logging
+
 class Node():
     def __init__(self):
         self._name = ""
@@ -12,6 +14,7 @@ class Node():
         return self
 
     def execute(self) -> str:
+        logging.debug(f"Executing node: {self._name}")
         if self._routes:
             if len(self._routes) == 1:
                 return list(self._routes[0].keys())[0]

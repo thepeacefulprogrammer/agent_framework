@@ -11,4 +11,11 @@ class Graph():
         if starting_node not in self.nodes:
             raise ValueError("Starting node must be part of the graph's nodes.")
         self.starting_node = starting_node
-        self.starting_node.execute()
+        next_node = self.starting_node.execute()
+        while len(next_node) > 0:
+            for node in self.nodes:
+                if node._name == next_node:
+                    next_node = node.execute()
+                    break
+        else:
+            print("No next node to run.")
