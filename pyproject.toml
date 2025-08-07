@@ -20,7 +20,7 @@ classifiers = [
 ]
 keywords = ["agent", "framework", "multi-agent", "ai", "artificial intelligence"]
 
-dependencies = []
+dependencies = ["OpenAI", "python-dotenv"]
 
 [project.urls]
 Repository = "https://github.com/thepeacefulprogrammer/agent_framework"
@@ -41,4 +41,5 @@ disallow_untyped_defs = true
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "rich"
 ]
