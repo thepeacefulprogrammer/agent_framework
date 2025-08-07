@@ -30,3 +30,7 @@ def test_graph_has_starting_node_attribute():
     assert hasattr(graph, 'starting_node')
     assert graph.starting_node is None
     
+def test_graph_run_with_no_nodes():
+    graph = Graph()
+    with pytest.raises(RuntimeError, match="Graph has no nodes to run."):
+        graph.run()
