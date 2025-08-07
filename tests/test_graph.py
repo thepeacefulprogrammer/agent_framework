@@ -34,3 +34,13 @@ def test_graph_run_with_no_nodes():
     graph = Graph()
     with pytest.raises(RuntimeError, match="Graph has no nodes to run."):
         graph.run()
+
+def test_graph_run_with_nodes():
+    graph = Graph()
+    node = Node()
+    graph.nodes.append(node)
+    graph.starting_node = node
+    try:
+        graph.run()  # Assuming run does not raise an error when nodes are present
+    except Exception as e:
+        pytest.fail(f"Graph.run() raised an exception unexpectedly: {e}")
