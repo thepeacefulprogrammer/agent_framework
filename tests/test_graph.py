@@ -1,4 +1,4 @@
-import pytest
+from unittest.mock import MagicMock
 from minimal_agent_framework import Graph, Node
 
 def test_graph_creation():
@@ -30,17 +30,20 @@ def test_graph_has_starting_node_attribute():
     assert hasattr(graph, 'starting_node')
     assert graph.starting_node is None
     
-def test_graph_run_with_no_nodes():
+def test_starting_node_starts_with_graph_run():
     graph = Graph()
-    with pytest.raises(RuntimeError, match="Graph has no nodes to run."):
-        graph.run()
+    mock_node = MagicMock()
+    graph.nodes.append(mock_node)
+    graph.run(mock_node)
+    mock_node.execute.assert_called_once()
 
-def test_graph_run_with_nodes():
+def test_starting_node_failes_if_node_has_not_been_added():
     graph = Graph()
-    node = Node()
-    graph.nodes.append(node)
-    graph.starting_node = node
+    mock_node = MagicMock()
+    other_node = MagicMock()
+    graph.nodes.append(other_node)
     try:
-        graph.run()  # Assuming run does not raise an error when nodes are present
-    except Exception as e:
-        pytest.fail(f"Graph.run() raised an exception unexpectedly: {e}")
+        graph.run(mock_node)
+        assert False, "Expected ValueError when starting node is not in graph"
+    except ValueError as e:
+        assert str(e) == "Starting node must be part of the graph's nodes."
