@@ -47,3 +47,12 @@ def test_starting_node_failes_if_node_has_not_been_added():
         assert False, "Expected ValueError when starting node is not in graph"
     except ValueError as e:
         assert str(e) == "Starting node must be part of the graph's nodes."
+
+def test_running_node_returns_next_node_name_to_run():
+    graph = Graph()
+    node_1 = Node().name("node_1").routes([{"node_2": "default"}])
+    node_2 = Node().name("node_2")
+    graph.nodes.append(node_1)
+    graph.nodes.append(node_2)
+    graph.run(node_1)
+    assert node_1.execute() == "node_2"
