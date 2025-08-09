@@ -1,7 +1,6 @@
 
 from dotenv import load_dotenv
-from minimal_agent_framework import tool
-from minimal_agent_framework import call_llm
+from minimal_agent_framework import tool, call_llm, EventEmitter
 from pydantic import BaseModel
 
 import logging
@@ -22,8 +21,15 @@ class OutputTest(BaseModel):
     """Test output model."""
     output_process_used: str
     output_text: str
-  
+
+def handler(x: str):
+    print(f"{x}", end='', flush=True)
+
 
 if __name__ == "__main__":
-    response = call_llm(input="use the add_numbers tool to add 5 and 3, and then use it again to add 10 and 20. Respond with the output text that will be seen by the user, and also return the process used to generate the output.")    
+
+    events = EventEmitter()
+    events.on("text", handler)
+
+    response = call_llm(input="use the add_numbers tool to add 5 and 3, and then use it again to add 10 and 20. Respond with the output text that will be seen by the user, and also return the process used to generate the output.", events=events)    
 
