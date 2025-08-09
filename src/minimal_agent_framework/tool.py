@@ -6,8 +6,6 @@ from typing import Any, Callable, Dict, List, Optional, get_type_hints
 import openai
 from pydantic import BaseModel, create_model
 
-logger = logging.getLogger(__name__)
-
 class ToolRegistry:
     """Function-only tool registry for OpenAI Responses API."""
     _funcs: Dict[str, Callable[..., Any]] = {}
@@ -35,7 +33,7 @@ class ToolRegistry:
         if tool_name not in cls._order:
             cls._order.append(tool_name)
 
-        logger.info(f"Registered tool: {tool_name}")
+        logging.debug(f"Registered tool: {tool_name}")
         return func  # keep original callable behavior
 
     @classmethod
@@ -55,7 +53,7 @@ class ToolRegistry:
             try:
                 args = json.loads(args) if args else {}
             except json.JSONDecodeError:
-                logger.warning(f"Arguments for tool '{name}' not valid JSON; passing raw string")
+                logging.warning(f"Arguments for tool '{name}' not valid JSON; passing raw string")
         if args is None:
             args = {}
         if not isinstance(args, dict):

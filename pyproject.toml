@@ -41,5 +41,4 @@ disallow_untyped_defs = true
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "rich"
 ]

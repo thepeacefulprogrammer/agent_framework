@@ -1,97 +1,61 @@
-from typing import Callable, get_type_hints
-import inspect
-from functools import wraps
 from openai import OpenAI
 from pydantic import BaseModel
-from typing import Type, Optional
+import os
+from openai import OpenAI
+from openai.types.responses import ResponseFunctionToolCall, ParsedResponse
+import json
+from pydantic import BaseModel
+import logging
+from minimal_agent_framework.tool import ToolRegistry
 
-TOOL_REGISTRY: dict[str, Callable] = {}
-TOOL_SCHEMAS: dict[str, dict] = {}
+def call_llm(input: str | list, response_id: str | None = None, output: type[BaseModel] | None = None) -> ParsedResponse:
+    """Call the OpenAI LLM with the provided input and return the response."""
 
-def tool(name: str):
-    """Decorator to register tools for LLM use"""
-    def decorator(func: Callable):
-        # Generate OpenAI function schema
-        sig = inspect.signature(func)
-        type_hints = get_type_hints(func)
-        
-        properties = {}
-        required = []
-        
-        for param_name, param in sig.parameters.items():
-            if param_name == 'context':  # Skip context parameter
-                continue
-                
-            param_type = type_hints.get(param_name, str)
-            
-            # Convert Python types to JSON Schema types
-            if param_type == str:
-                json_type = "string"
-            elif param_type == int:
-                json_type = "integer"
-            elif param_type == float:
-                json_type = "number"
-            elif param_type == bool:
-                json_type = "boolean"
-            elif param_type == list:
-                json_type = "array"
-            elif param_type == dict:
-                json_type = "object"
-            else:
-                json_type = "string"
-            
-            properties[param_name] = {
-                "type": json_type,
-                "description": f"Parameter {param_name}"
-            }
-            
-            if param.default == param.empty:
-                required.append(param_name)
-        
-        schema = {
-            "name": name,
-            "description": func.__doc__ or f"Tool: {name}",
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": required
-            }
-        }
-        
-        TOOL_REGISTRY[name] = func
-        TOOL_SCHEMAS[name] = schema
-        
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            return await func(*args, **kwargs)
-        
-        return wrapper
-    return decorator
+    api_key = os.getenv("AZURE_API_KEY")
+    base_url = os.getenv("AZURE_API_ENDPOINT")
 
-class OpenAI_Client:
-    def __init__(self, api_key: str, base_url: str, model: str = "o4-mini"):
-        self.client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
-        self.model = model
+    client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
 
-    def call_llm(self, user_prompt : str, instructions : str, output: Optional[Type[BaseModel]], restart_conversation: bool = False, tools: Optional[list[str]] = None):
-        
-        openai_tools = []
-        if tools:
-            for tool_name in tools:
-                if tool_name in TOOL_SCHEMAS:
-                    openai_tools.append({ 
-                        "type": "function", 
-                        "function": TOOL_SCHEMAS[tool_name]
+    if isinstance(input, str):
+        input = [{
+            "role": "user", 
+            "content": input,
+        }]
+
+    kwargs = {}
+    if response_id:
+        kwargs['previous_response_id'] = response_id
+    
+    if output:
+        kwargs['text_format'] = output
+
+    logging.debug(f"Calling LLM with input: {input} and response_id: {response_id}")
+
+    with client.responses.stream(
+        input=input,
+        model="o4-mini",
+        tools=ToolRegistry.get_tools(),
+        **kwargs
+        ) as stream:
+            tool_calls = []
+            previous_response_id = ""
+
+            for event in stream:
+                if event.type == "response.created":
+                    previous_response_id = event.response.id
+                elif event.type == "response.output_text.delta":
+                    print(event.delta, end='', flush=True)
+                elif event.type == "response.output_item.done":
+                    tool_call = event.item
+                    if isinstance(tool_call, ResponseFunctionToolCall):
+                        output = ToolRegistry.call(tool_call.name, tool_call.arguments)
+                        tool_calls.append({
+                            "type": "function_call_output",
+                            "call_id": tool_call.call_id,
+                            "output": json.dumps(output) if isinstance(output, dict) else str(output)
+
                         })
-
-        response = self.client.responses.create(
-            model=self.model,
-            input=user_prompt,
-            instructions=instructions,
-            tools=openai_tools,
-            stream=True,
-            temperature=0.1,
-            truncation="auto",
-
-        )
-
+            if len(tool_calls) > 0:
+                return call_llm(tool_calls, previous_response_id)
+        
+    return stream.get_final_response()
