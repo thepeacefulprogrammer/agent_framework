@@ -28,19 +28,26 @@ if __name__ == "__main__":
     graph = Graph(events)
     
     node1 = (Node()
-             .name("Start")
+             .name("first")
              .input("Hi there!")
-             .routes([{"NextNode": "default"}])
+             .routes([{"second": "default"}])
              .pre(sample_pre_function)
              .post(sample_post_function))
 
     node2 = (Node()
-             .name("NextNode")
+             .name("second")
+             .input("Do you have a name?")
+             .routes([{"third": "default"}])
+             .pre(sample_pre_function)
+             .post(sample_post_function))
+
+    node3 = (Node()
+             .name("third")
              .input("Do you know what today's date is?")
              .post(sample_post_function)
              )
     
-    graph.nodes.append(node1)
-    graph.nodes.append(node2)
+    graph.add(node1)
+    graph.add_nodes([node2, node3])
     
     graph.run(node1)
