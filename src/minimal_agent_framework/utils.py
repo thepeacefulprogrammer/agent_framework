@@ -23,7 +23,7 @@ class EventEmitter:
             for callback in self._listeners[event]:
                 callback(*args, **kwargs)
 
-def call_llm(input: str | list, response_id: str | None = None, output: type[BaseModel] | None = None, events: EventEmitter | None = None) -> ParsedResponse:
+def call_llm(input: str | list, instructions: str | None = None, response_id: str | None = None, output: type[BaseModel] | None = None, events: EventEmitter | None = None) -> ParsedResponse:
     """Call the OpenAI LLM with the provided input and return the response."""
 
     api_key = os.getenv("AZURE_API_KEY")
@@ -42,6 +42,8 @@ def call_llm(input: str | list, response_id: str | None = None, output: type[Bas
         kwargs['previous_response_id'] = response_id
     if output:
         kwargs['text_format'] = output
+    if instructions:
+        kwargs['instructions'] = instructions
 
     logging.debug(f"Calling LLM with input: {input} and response_id: {response_id}")
 

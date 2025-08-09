@@ -29,14 +29,16 @@ if __name__ == "__main__":
     
     node1 = (Node()
              .name("first")
-             .input("Hi there!")
+             .context_keys(["name", "location"])
+             .input("Hi there! Do you know who I am and my location?")
+             .instructions("Speak like a prirate")
              .routes([{"second": "default"}])
              .pre(sample_pre_function)
              .post(sample_post_function))
 
     node2 = (Node()
              .name("second")
-             .input("Do you have a name?")
+             .input("Do you know my name?")
              .routes([{"third": "default"}])
              .pre(sample_pre_function)
              .post(sample_post_function))
@@ -47,7 +49,9 @@ if __name__ == "__main__":
              .post(sample_post_function)
              )
     
-    graph.add(node1)
-    graph.add_nodes([node2, node3])
-    
-    graph.run(node1)
+    graph.add_nodes([node1, node2, node3])
+    context = {
+        "name": "Randy",
+        "location": "Earth"
+    }
+    graph.run(node1, context)
