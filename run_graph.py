@@ -1,7 +1,15 @@
 from src.minimal_agent_framework import Graph, Node
 import logging
+from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+
+for name in ("httpx", "httpcore"):
+    lg = logging.getLogger(name)
+    lg.setLevel(logging.ERROR)
+
+load_dotenv()
+
 
 def sample_pre_function():
     logging.debug("Pre-function executed")
@@ -15,12 +23,14 @@ if __name__ == "__main__":
     
     node1 = (Node()
              .name("Start")
+             .input("Hi there!")
              .routes([{"NextNode": "default"}])
              .pre(sample_pre_function)
              .post(sample_post_function))
 
     node2 = (Node()
              .name("NextNode")
+             .input("Do you know what today's date is?")
              .post(sample_post_function)
              )
     
