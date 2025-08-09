@@ -5,19 +5,15 @@ from .utils import EventEmitter, call_llm
 class Node():
     def __init__(self):
         self._name = ""
-        self._events = EventEmitter()
-        self._events.on("text", self.handler)
-
-    def handler(self, x: str):
-        print(f"{x}", end='', flush=True)
-
-    def name(self, name: str) -> 'Node':
-        self._name: str = name
         self._routes: list[dict[str, str]] = []
         self._pre_func: Optional[Callable] = None
         self._post_func: Optional[Callable] = None
         self._instructions: Optional[str] = None
         self._input: Optional[str] = None
+        self._events : Optional[EventEmitter] = None
+
+    def name(self, name: str) -> 'Node':
+        self._name: str = name
         return self
 
     def input(self, input: str) -> 'Node':
@@ -39,8 +35,8 @@ class Node():
     def post(self, func: Callable) -> 'Node':
         self._post_func = func
         return self
-
-    def execute(self) -> str:
+    
+    def execute(self, events : EventEmitter | None = None) -> str:
         logging.debug(f"Executing node: {self._name}")
         
         if self._pre_func:
@@ -48,7 +44,7 @@ class Node():
             self._pre_func()
 
         if self._input:
-            call_llm(self._input, events=self._events)
+            call_llm(self._input, events=events)
 
         if self._post_func:
             logging.debug(f"Running post-function for node: {self._name}")

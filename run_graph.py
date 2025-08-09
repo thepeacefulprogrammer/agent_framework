@@ -1,4 +1,4 @@
-from src.minimal_agent_framework import Graph, Node
+from src.minimal_agent_framework import Graph, Node, EventEmitter
 import logging
 from dotenv import load_dotenv
 
@@ -10,16 +10,22 @@ for name in ("httpx", "httpcore"):
 
 load_dotenv()
 
-
 def sample_pre_function():
     logging.debug("Pre-function executed")
 
 def sample_post_function():
     logging.debug("Post-function executed")
 
+def handler(x: str):
+    print(f"{x}", end='', flush=True)
+
 if __name__ == "__main__":
     # Example usage of Graph and Node
-    graph = Graph()
+    
+    events = EventEmitter()
+    events.on("text", handler)
+
+    graph = Graph(events)
     
     node1 = (Node()
              .name("Start")
