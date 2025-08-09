@@ -38,6 +38,7 @@ if __name__ == "__main__":
 
     node2 = (Node()
              .name("second")
+             .context_keys(["all"])
              .input("Do you know my name?")
              .routes([{"third": "default"}])
              .pre(sample_pre_function)

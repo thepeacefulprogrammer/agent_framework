@@ -49,7 +49,10 @@ class Node():
             self._pre_func()
 
         if len(self._context_keys) > 0 and full_context:
-            self._context = {key: full_context[key] for key in self._context_keys if key in full_context}
+            if self._context_keys[0] == "all":
+                self._context = full_context
+            else:
+                self._context = {key: full_context[key] for key in self._context_keys if key in full_context}
             logging.debug(f"Context for node {self._name}: {self._context}")
 
             if not self._instructions:
