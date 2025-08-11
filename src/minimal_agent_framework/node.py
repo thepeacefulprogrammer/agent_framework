@@ -8,7 +8,7 @@ class Node():
         self._name = ""
         self._routes: list[dict[str, str]] = []
         self._pre_func: dict[str, Any] = {}
-        self._post_func: Optional[Callable[..., Any]] = None
+        self._post_func: dict[str, Any] = {}
         self._instructions: Optional[str] = None
         self._input: Optional[str] = None
         self._context_keys: list[str] = []
@@ -38,8 +38,8 @@ class Node():
         self._pre_func = {"func": func, "args": args}
         return self
 
-    def post(self, func: Callable) -> 'Node':
-        self._post_func = func
+    def post(self, func: Callable, args: list | None = None) -> 'Node':
+        self._post_func = {"func": func, "args": args}
         return self
     
     def execute(self, events : EventEmitter | None = None, full_context: dict[str, str] | None = None) -> str:
@@ -71,8 +71,12 @@ class Node():
                 call_llm(self._input, events=events)
 
         if self._post_func:
-            logging.debug(f"Running post-function for node: {self._name}")
-            self._post_func()
+            logging.debug(f"Running pre-function for node: {self._name}")
+            args = self._post_func.get("args", [])
+            if args is None:
+                self._post_func['func']()
+            else:
+                self._post_func['func'](*args)
 
         if self._routes:
             if len(self._routes) == 1:
