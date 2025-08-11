@@ -1,13 +1,14 @@
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Any, get_type_hints
 from .utils import EventEmitter, call_llm
+import inspect
 
 class Node():
     def __init__(self):
         self._name = ""
         self._routes: list[dict[str, str]] = []
-        self._pre_func: Optional[Callable] = None
-        self._post_func: Optional[Callable] = None
+        self._pre_func: dict[str, Any] = {}
+        self._post_func: Optional[Callable[..., Any]] = None
         self._instructions: Optional[str] = None
         self._input: Optional[str] = None
         self._context_keys: list[str] = []
@@ -33,10 +34,10 @@ class Node():
         self._routes = routes
         return self
     
-    def pre(self, func: Callable) -> 'Node':
-        self._pre_func = func
+    def pre(self, func: Callable, args: list | None = None) -> 'Node':
+        self._pre_func = {"func": func, "args": args}
         return self
-    
+
     def post(self, func: Callable) -> 'Node':
         self._post_func = func
         return self
@@ -46,7 +47,11 @@ class Node():
         
         if self._pre_func:
             logging.debug(f"Running pre-function for node: {self._name}")
-            self._pre_func()
+            args = self._pre_func.get("args", [])
+            if args is None:
+                self._pre_func['func']()
+            else:
+                self._pre_func['func'](*args)
 
         if len(self._context_keys) > 0 and full_context:
             if self._context_keys[0] == "all":

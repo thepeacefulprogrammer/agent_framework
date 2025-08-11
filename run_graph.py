@@ -2,7 +2,7 @@ from src.minimal_agent_framework import Graph, Node, EventEmitter
 import logging
 from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 for name in ("httpx", "httpcore"):
     lg = logging.getLogger(name)
@@ -16,6 +16,11 @@ def sample_pre_function():
 def sample_post_function():
     logging.debug("Post-function executed")
 
+def change_my_name(ctx: dict[str, str], name: str):
+    logging.debug(f"Changing name in context from {ctx['name']} to {name}")
+    ctx['name'] = name
+
+
 def handler(x: str):
     print(f"{x}", end='', flush=True)
 
@@ -24,6 +29,11 @@ if __name__ == "__main__":
     
     events = EventEmitter()
     events.on("text", handler)
+
+    context = {
+        "name": "Randy",
+        "location": "Earth"
+    }
 
     graph = Graph(events)
     
@@ -39,10 +49,10 @@ if __name__ == "__main__":
     node2 = (Node()
              .name("second")
              .context_keys(["all"])
+             .pre(change_my_name, [context, "Ted"])
              .input("Do you know my name?")
-             .routes([{"third": "default"}])
-             .pre(sample_pre_function)
-             .post(sample_post_function))
+             .post(sample_post_function)
+             .routes([{"third": "default"}]))
 
     node3 = (Node()
              .name("third")
@@ -50,9 +60,7 @@ if __name__ == "__main__":
              .post(sample_post_function)
              )
     
+    logging.debug("Adding nodes to graph")
     graph.add_nodes([node1, node2, node3])
-    context = {
-        "name": "Randy",
-        "location": "Earth"
-    }
+    
     graph.run(node1, context)
