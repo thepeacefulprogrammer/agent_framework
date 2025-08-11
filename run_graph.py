@@ -2,7 +2,7 @@ from src.minimal_agent_framework import Graph, Node, EventEmitter
 import logging
 from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 for name in ("httpx", "httpcore"):
     lg = logging.getLogger(name)
@@ -39,10 +39,10 @@ if __name__ == "__main__":
     
     node1 = (Node()
              .name("first")
-             .context_keys(["name", "location"])
+             .context_keys(["location"])
              .input("Hi there! Do you know who I am and my location?")
              .instructions("Speak like a prirate")
-             .routes([{"second": "default"}])
+             .routes([{"second": "you do not know my location"}, {"third": "you do not know my name"}])
              .pre(sample_pre_function)
              .post(sample_post_function))
 
@@ -52,11 +52,12 @@ if __name__ == "__main__":
              .pre(change_my_name, [context, "Ted"])
              .input("Do you know my name?")
              .post(sample_post_function)
-             .routes([{"third": "default"}]))
+             .routes([{"third": "this is the default criteria"}]))
 
     node3 = (Node()
              .name("third")
-             .input("Do you know what today's date is?")
+             .context_keys(["name"])
+             .input("Do you know my name now?")
              .post(sample_post_function)
              )
     

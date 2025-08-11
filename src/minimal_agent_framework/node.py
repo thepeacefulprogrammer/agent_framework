@@ -1,7 +1,20 @@
 import logging
-from typing import Optional, Callable, Any, get_type_hints
+from typing import Optional, Callable, Any
+from pydantic import BaseModel
 from .utils import EventEmitter, call_llm
-import inspect
+
+class Response(BaseModel):
+    """Response model for the node execution.
+    
+    Attributes:
+        text_response_to_user: The response text to be sent to the user.
+        next_node: The name of the next node to route to.
+        rationale: The reasoning behind the choice of the next node.
+    """
+    text_response_to_user: str
+    next_node: str
+    rationale: str
+
 
 class Node():
     def __init__(self):
@@ -44,6 +57,9 @@ class Node():
     
     def execute(self, events : EventEmitter | None = None, full_context: dict[str, str] | None = None) -> str:
         logging.debug(f"Executing node: {self._name}")
+
+        if not self._instructions:
+                self._instructions = ""
         
         if self._pre_func:
             logging.debug(f"Running pre-function for node: {self._name}")
@@ -60,15 +76,19 @@ class Node():
                 self._context = {key: full_context[key] for key in self._context_keys if key in full_context}
             logging.debug(f"Context for node {self._name}: {self._context}")
 
-            if not self._instructions:
-                self._instructions = ""
-            self._instructions += "\nContext: key:value\n" + " ".join(f"{k}: {v}\n" for k, v in self._context.items())
+            self._instructions += "\nContext: (key: value)\n" + " ".join(f"{k}: {v}\n" for k, v in self._context.items())
 
+        if len(self._routes) > 0:
+            self._instructions += f"\nOnce you have answered the question, you will decide which node to route to based on the following criteria (name, criteria):\n" + "".join(f"{list(route.keys())[0]}: criteria = {list(route.values())[0]}\n" for route in self._routes) + "\nProvide the rationale for your choice in the response.\n"
+        else:
+            self._instructions += "\nThere is no next node, so return an empty string"
+
+        response = ""
         if events:
-            if self._input and self._instructions:
-                call_llm(self._input, instructions=self._instructions, events=events)
-            elif self._input:
-                call_llm(self._input, events=events)
+            if self._input:
+                response = call_llm(self._input, instructions=self._instructions, events=events, output=Response)
+            else:
+                response = call_llm(self._instructions, events=events, output=Response)
 
         if self._post_func:
             logging.debug(f"Running pre-function for node: {self._name}")
@@ -78,7 +98,5 @@ class Node():
             else:
                 self._post_func['func'](*args)
 
-        if self._routes:
-            if len(self._routes) == 1:
-                return list(self._routes[0].keys())[0]
-        return ""
+        r = Response.model_validate(response)
+        return r.next_node
