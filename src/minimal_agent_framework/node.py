@@ -65,7 +65,6 @@ class Node(BaseModel):
         for key, value in self._local_context.items():
             context_info += f"{key}: {value}"
 
-
         self._instructions += context_info
         
         if self._pre_func:

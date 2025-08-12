@@ -39,30 +39,19 @@ if __name__ == "__main__":
 
     graph = Graph()
 
-    node1 = Node()
-    node2 = Node()
-    node3 = Node()
-    
-    (node1
+    node1 = (Node()
         .name("first").instructions("Speak like a pirate")
         .pre(sample_pre_function)
         .input("Hi. Use the magic word tool and tell me what the magic word is, then. Tell me if you know my name and location.")
-        .routes({
-            node2._id: "you do know my name and location",
-            node3._id: "you do not know both my name and location",
-            })
         .post(change_my_name, ["Ted"]))
 
-    (node2
+    node2 = (Node()
         .name("second")
         .context({
             "dog_name": "Rocky"
         })
-        .input("Do you know my name? How about my dog's name?")
+        .input("Do yoy know my dog's name? How about my name?")
         .post(sample_post_function)
-        .routes({
-            node3._id: "this is the default criteria"
-            })
         )
 
     node3 = (Node()
@@ -70,6 +59,15 @@ if __name__ == "__main__":
         .input("Do you know my name now?")
         .post(sample_post_function)
         )
+    
+    node1.routes({
+        node2._id: "the magic word was pineapple",
+        node3._id: "the magic word was grape",
+        })
+    
+    node2.routes({
+        node3._id: "default route",
+        })
     
     logging.debug("Adding nodes to graph")
     graph.add_nodes([node1, node2, node3])

@@ -1,5 +1,4 @@
 from .node import Node
-from .utils import EventEmitter
 from .ctx import context
 import logging
 from .tool import tool
