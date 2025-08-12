@@ -121,3 +121,4 @@ def _build_model_from_func(func: Callable[..., Any], model_name: str, descriptio
     model.__doc__ = description or (func.__doc__ or "")
 
     return model
+

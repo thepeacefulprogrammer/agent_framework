@@ -1,8 +1,8 @@
 import logging
 from typing import Optional, Callable, Any
-from .utils import EventEmitter, call_llm
-import json
+from .utils import call_llm
 from .ctx import context
+from .prompts import instructions
 from pydantic import BaseModel
 from uuid import uuid4
 
@@ -13,7 +13,7 @@ class Node(BaseModel):
         self._routes: dict[str, str] = {}
         self._pre_func: dict[str, Any] = {}
         self._post_func: dict[str, Any] = {}
-        self._instructions: Optional[str] = None
+        self._instructions: str = instructions
         self._input: Optional[str] = None
         self._local_context: dict[str, str] = {}
 
@@ -33,8 +33,8 @@ class Node(BaseModel):
         self._input = input
         return self
 
-    def instructions(self, instructions: str) -> 'Node':
-        self._instructions = instructions
+    def instructions(self, specifics: str) -> 'Node':
+        self._instructions += f"\nSpecific instructions: {specifics}"
         return self
 
     def routes(self, routes: dict[str, str]) -> 'Node':
@@ -52,18 +52,16 @@ class Node(BaseModel):
     def execute(self):
         logging.info(f"Executing node: {self._name}")
 
-        if not self._instructions:
-                self._instructions = ""
-
         context_info = "\nContext (key: value)\n"
+        keys_to_skip = ["next_node", "nodes", "running", "events", "client", "response_id"]
         for key, value in vars(context).items():
-            if key == "next_node" or key == "nodes" or key == "running":
+            if key in keys_to_skip:
                 continue
             else:
                 context_info += f"{key}: {value}\n"
 
         for key, value in self._local_context.items():
-            context_info += f"{key}: {value}"
+            context_info += f"{key}: {value}\n"
 
         self._instructions += context_info
         
@@ -82,7 +80,7 @@ class Node(BaseModel):
                 route_info += f"{node}: criteria: {self._routes.get(id)}\n"
 
         if len(self._routes) > 0:
-            self._instructions += f"\nOnce you have answered the question, you will decide which node to route to based on the following criteria (node, criteria):\n" + route_info + "\nYou will then call the route tool to route to the next node, along with your rationale for routing to that node.\n"
+            self._instructions += f"\nYou must decide which node to route to based on the following criteria (node, criteria):\n" + route_info + "\nYou will then call the route tool to route to the next node, along with your rationale for routing to that node. You must call the route tool.\n"
         else:
             context.running = False
 
@@ -92,7 +90,7 @@ class Node(BaseModel):
             call_llm(self._instructions)
 
         if self._post_func:
-            logging.debug(f"Running pre-function for node: {self._name}")
+            logging.debug(f"Running post-function for node: {self._name}")
             args = self._post_func.get("args", [])
             if args is None:
                 self._post_func['func']()

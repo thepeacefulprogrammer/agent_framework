@@ -6,14 +6,21 @@ import os
 from openai import OpenAI
 
 @tool
-def route(next_node_id: str, rationale: str):
-    next_node : Node | None = next((n for n in context.nodes if n._id == next_node_id), None)
-    if next_node:
-        logging.debug(f"Routing to {next_node.name} with rationale: {rationale}")
-    else:
-        logging.debug(f"No next node with rationale: {rationale}")
-    context.next_node = next_node
-        
+def route(to_node_id: str, rationale: str):
+    """
+    Route to the next node:
+
+    Arguments:
+
+    to_node: the id of the node to route to
+    rationale: the reason for choosing this node to route to
+    """
+    nodes = context.nodes
+    to_node = next((n for n in nodes if n._id == to_node_id), None)
+    context.next_node = to_node
+
+    return "success"
+
 class Graph():
     def __init__(self):
         if getattr(context, "nodes", None) is None:
@@ -22,6 +29,7 @@ class Graph():
             api_key = os.getenv("AZURE_API_KEY")
             base_url = os.getenv("AZURE_API_ENDPOINT")
             context.client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+        context.response_id = None
 
     
     def add(self, node: Node) -> 'Graph':

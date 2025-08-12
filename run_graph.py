@@ -20,8 +20,11 @@ def change_my_name(name: str):
     context.name = name
 
 
-def handler(x: str):
+def text_handler(x: str):
     print(f"{x}", end='', flush=True)
+
+def tool_call_handler(x: str):
+    print(f"\n🛠️  Tool Called: {x}\n")
 
 @tool
 def get_the_magic_word() -> str:
@@ -31,7 +34,8 @@ if __name__ == "__main__":
     # Example usage of Graph and Node
     
     events = EventEmitter()
-    events.on("text", handler)
+    events.on("text", text_handler)
+    events.on("tool_call", tool_call_handler)
 
     context.name = "Randy"
     context.location = "Earth"
