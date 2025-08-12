@@ -15,14 +15,14 @@ class Node(BaseModel):
         self._post_func: dict[str, Any] = {}
         self._instructions: Optional[str] = None
         self._input: Optional[str] = None
-        self._context: list[str] = []
+        self._local_context: dict[str, str] = {}
 
     def __str__(self) -> str:
         return f"\nID: {self._id} Name: {self._name}"
 
-    def context(self, keys: list[str]) -> 'Node':
-        """Set a context variable for the node."""
-        self._context_keys = keys
+    def context(self, local_context: dict[str, str]) -> 'Node':
+        """Set a context variable only for this node"""
+        self._local_context = local_context
         return self
 
     def name(self, name: str) -> 'Node':
@@ -61,6 +61,10 @@ class Node(BaseModel):
                 continue
             else:
                 context_info += f"{key}: {value}\n"
+
+        for key, value in self._local_context.items():
+            context_info += f"{key}: {value}"
+
 
         self._instructions += context_info
         

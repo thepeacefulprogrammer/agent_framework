@@ -55,7 +55,10 @@ if __name__ == "__main__":
 
     (node2
         .name("second")
-        .input("Do you know my name?")
+        .context({
+            "dog_name": "Rocky"
+        })
+        .input("Do you know my name? How about my dog's name?")
         .post(sample_post_function)
         .routes({
             node3._id: "this is the default criteria"
