@@ -1,4 +1,4 @@
-from src.minimal_agent_framework import Graph, Node, EventEmitter
+from src.minimal_agent_framework import Graph, Node, EventEmitter, tool, context
 import logging
 from dotenv import load_dotenv
 
@@ -16,13 +16,16 @@ def sample_pre_function():
 def sample_post_function():
     logging.debug("Post-function executed")
 
-def change_my_name(ctx: dict[str, str], name: str):
-    logging.debug(f"Changing name in context from {ctx['name']} to {name}")
-    ctx['name'] = name
+def change_my_name(name: str):
+    context.name = name
 
 
 def handler(x: str):
     print(f"{x}", end='', flush=True)
+
+@tool
+def get_the_magic_word() -> str:
+    return "pineapple"
 
 if __name__ == "__main__":
     # Example usage of Graph and Node
@@ -30,38 +33,42 @@ if __name__ == "__main__":
     events = EventEmitter()
     events.on("text", handler)
 
-    context = {
-        "name": "Randy",
-        "location": "Earth"
-    }
+    context.name = "Randy"
+    context.location = "Earth"
+    context.events = events
 
-    graph = Graph(events)
+    graph = Graph()
+
+    node1 = Node()
+    node2 = Node()
+    node3 = Node()
     
-    node1 = (Node()
-             .name("first")
-             .context_keys(["location"])
-             .input("Hi there! Do you know who I am and my location?")
-             .instructions("Speak like a prirate")
-             .routes([{"second": "you do not know my location"}, {"third": "you do not know my name"}])
-             .pre(sample_pre_function)
-             .post(sample_post_function))
+    (node1
+        .name("first").instructions("Speak like a pirate")
+        .pre(sample_pre_function)
+        .input("Hi. Use the magic word tool and tell me what the magic word is, then. Tell me if you know my name and location.")
+        .routes({
+            node2._id: "you do know my name and location",
+            node3._id: "you do not know both my name and location",
+            })
+        .post(change_my_name, ["Ted"]))
 
-    node2 = (Node()
-             .name("second")
-             .context_keys(["all"])
-             .pre(change_my_name, [context, "Ted"])
-             .input("Do you know my name?")
-             .post(sample_post_function)
-             .routes([{"third": "this is the default criteria"}]))
+    (node2
+        .name("second")
+        .input("Do you know my name?")
+        .post(sample_post_function)
+        .routes({
+            node3._id: "this is the default criteria"
+            })
+        )
 
     node3 = (Node()
-             .name("third")
-             .context_keys(["name"])
-             .input("Do you know my name now?")
-             .post(sample_post_function)
-             )
+        .name("third")
+        .input("Do you know my name now?")
+        .post(sample_post_function)
+        )
     
     logging.debug("Adding nodes to graph")
     graph.add_nodes([node1, node2, node3])
     
-    graph.run(node1, context)
+    graph.run(node1)

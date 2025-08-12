@@ -1,13 +1,12 @@
-from openai import OpenAI
 from pydantic import BaseModel
-import os
-from openai import OpenAI
-from openai.types.responses import ResponseFunctionToolCall, ParsedResponse
+from openai.types.responses import ResponseFunctionToolCall
 import json
 from pydantic import BaseModel
 import logging
-from minimal_agent_framework.tool import ToolRegistry
+from .tool import ToolRegistry
 from typing import Callable
+from .ctx import context
+
 
 class EventEmitter:
     def __init__(self):
@@ -23,13 +22,8 @@ class EventEmitter:
             for callback in self._listeners[event]:
                 callback(*args, **kwargs)
 
-def call_llm(input: str | list, instructions: str | None = None, response_id: str | None = None, output: type[BaseModel] | None = None, events: EventEmitter | None = None):
+def call_llm(input: str | list, instructions: str | None = None, response_id: str | None = None, output: type[BaseModel] | None = None):
     """Call the OpenAI LLM with the provided input and return the response."""
-
-    api_key = os.getenv("AZURE_API_KEY")
-    base_url = os.getenv("AZURE_API_ENDPOINT")
-
-    client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
 
     if isinstance(input, str):
         input = [{
@@ -47,22 +41,23 @@ def call_llm(input: str | list, instructions: str | None = None, response_id: st
 
     logging.debug(f"Calling LLM with input: {input} and response_id: {response_id}")
 
-    with client.responses.stream(
+    with context.client.responses.stream(
         input=input,
         model="o4-mini",
         tools=ToolRegistry.get_tools(),
         **kwargs
         ) as stream:
             tool_calls = []
-            previous_response_id = ""
+            current_response_id = ""
 
             for event in stream:
                 if event.type == "response.created":
-                    previous_response_id = event.response.id
-                elif event.type == "response.output_text.delta" and events:
-                    events.emit("text", event.delta)
+                    current_response_id = event.response.id
+                elif event.type == "response.output_text.delta":
+                    context.events.emit("text", event.delta)
                 elif event.type == "response.output_item.done":
                     tool_call = event.item
+                    context.events.emit("tool_call", )
                     if isinstance(tool_call, ResponseFunctionToolCall):
                         tool_output = ToolRegistry.call(tool_call.name, tool_call.arguments)
                         tool_calls.append({
@@ -71,7 +66,6 @@ def call_llm(input: str | list, instructions: str | None = None, response_id: st
                             "output": json.dumps(tool_output) if isinstance(tool_output, dict) else str(tool_output)
 
                         })
-            if len(tool_calls) > 0:
-                return call_llm(tool_calls, previous_response_id, output=output, events=events)
-        
-    return stream.get_final_response().output_parsed
+            if len(tool_calls) > 0:           
+                return call_llm(input=tool_calls, instructions=instructions, response_id=current_response_id, output=output)
+    

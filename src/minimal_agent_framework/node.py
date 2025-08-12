@@ -1,32 +1,26 @@
 import logging
 from typing import Optional, Callable, Any
-from pydantic import BaseModel
 from .utils import EventEmitter, call_llm
+import json
+from .ctx import context
+from pydantic import BaseModel
+from uuid import uuid4
 
-class Response(BaseModel):
-    """Response model for the node execution.
-    
-    Attributes:
-        text_response_to_user: The response text to be sent to the user.
-        next_node: The name of the next node to route to.
-        rationale: The reasoning behind the choice of the next node.
-    """
-    text_response_to_user: str
-    next_node: str
-    rationale: str
-
-
-class Node():
+class Node(BaseModel):
     def __init__(self):
+        self._id: str = uuid4().hex
         self._name = ""
-        self._routes: list[dict[str, str]] = []
+        self._routes: dict[str, str] = {}
         self._pre_func: dict[str, Any] = {}
         self._post_func: dict[str, Any] = {}
         self._instructions: Optional[str] = None
         self._input: Optional[str] = None
-        self._context_keys: list[str] = []
+        self._context: list[str] = []
 
-    def context_keys(self, keys: list[str]) -> 'Node':
+    def __str__(self) -> str:
+        return f"\nID: {self._id} Name: {self._name}"
+
+    def context(self, keys: list[str]) -> 'Node':
         """Set a context variable for the node."""
         self._context_keys = keys
         return self
@@ -43,7 +37,7 @@ class Node():
         self._instructions = instructions
         return self
 
-    def routes(self, routes: list[dict[str, str]]) -> 'Node':
+    def routes(self, routes: dict[str, str]) -> 'Node':
         self._routes = routes
         return self
     
@@ -55,11 +49,20 @@ class Node():
         self._post_func = {"func": func, "args": args}
         return self
     
-    def execute(self, events : EventEmitter | None = None, full_context: dict[str, str] | None = None) -> str:
-        logging.debug(f"Executing node: {self._name}")
+    def execute(self):
+        logging.info(f"Executing node: {self._name}")
 
         if not self._instructions:
                 self._instructions = ""
+
+        context_info = "\nContext (key: value)\n"
+        for key, value in vars(context).items():
+            if key == "next_node" or key == "nodes" or key == "running":
+                continue
+            else:
+                context_info += f"{key}: {value}\n"
+
+        self._instructions += context_info
         
         if self._pre_func:
             logging.debug(f"Running pre-function for node: {self._name}")
@@ -69,26 +72,21 @@ class Node():
             else:
                 self._pre_func['func'](*args)
 
-        if len(self._context_keys) > 0 and full_context:
-            if self._context_keys[0] == "all":
-                self._context = full_context
-            else:
-                self._context = {key: full_context[key] for key in self._context_keys if key in full_context}
-            logging.debug(f"Context for node {self._name}: {self._context}")
-
-            self._instructions += "\nContext: (key: value)\n" + " ".join(f"{k}: {v}\n" for k, v in self._context.items())
+        route_info = ""
+        for id in self._routes:
+            node = next((n for n in context.nodes if n._id == id), None)
+            if node:
+                route_info += f"{node}: criteria: {self._routes.get(id)}\n"
 
         if len(self._routes) > 0:
-            self._instructions += f"\nOnce you have answered the question, you will decide which node to route to based on the following criteria (name, criteria):\n" + "".join(f"{list(route.keys())[0]}: criteria = {list(route.values())[0]}\n" for route in self._routes) + "\nProvide the rationale for your choice in the response.\n"
+            self._instructions += f"\nOnce you have answered the question, you will decide which node to route to based on the following criteria (node, criteria):\n" + route_info + "\nYou will then call the route tool to route to the next node, along with your rationale for routing to that node.\n"
         else:
-            self._instructions += "\nThere is no next node, so return an empty string"
+            context.running = False
 
-        response = ""
-        if events:
-            if self._input:
-                response = call_llm(self._input, instructions=self._instructions, events=events, output=Response)
-            else:
-                response = call_llm(self._instructions, events=events, output=Response)
+        if self._input:
+            call_llm(self._input, instructions=self._instructions)
+        else:
+            call_llm(self._instructions)
 
         if self._post_func:
             logging.debug(f"Running pre-function for node: {self._name}")
@@ -97,6 +95,3 @@ class Node():
                 self._post_func['func']()
             else:
                 self._post_func['func'](*args)
-
-        r = Response.model_validate(response)
-        return r.next_node

@@ -1,38 +1,56 @@
 from .node import Node
 from .utils import EventEmitter
+from .ctx import context
 import logging
+from .tool import tool
+import os
+from openai import OpenAI
 
+@tool
+def route(next_node_id: str, rationale: str):
+    next_node : Node | None = next((n for n in context.nodes if n._id == next_node_id), None)
+    if next_node:
+        logging.debug(f"Routing to {next_node.name} with rationale: {rationale}")
+    else:
+        logging.debug(f"No next node with rationale: {rationale}")
+    context.next_node = next_node
+        
 class Graph():
-    def __init__(self, events : EventEmitter | None = None):
-        self.nodes: list[Node] = []
-        self.events = events
+    def __init__(self):
+        if getattr(context, "nodes", None) is None:
+            context.nodes = []
+        if getattr(context, "client", None) is None:
+            api_key = os.getenv("AZURE_API_KEY")
+            base_url = os.getenv("AZURE_API_ENDPOINT")
+            context.client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+
     
     def add(self, node: Node) -> 'Graph':
         if not isinstance(node, Node):
             raise TypeError("Node must be an instance of Node.")
-        self.nodes.append(node)
+        context.nodes.append(node)
         return self
 
     def add_nodes(self, nodes: list[Node]) -> 'Graph':
         for node in nodes:
             if not isinstance(node, Node):
                 raise TypeError("All items must be instances of Node.")
-            self.nodes.append(node)
+            context.nodes.append(node)
         return self
     
-    def run(self, starting_node: Node, context: dict[str, str] = {}):
-        if not self.nodes:
+    def run(self, starting_node: Node):
+        if not context.nodes:
             raise RuntimeError("Graph has no nodes to run.")
-        if starting_node not in self.nodes:
+        if starting_node not in context.nodes:
             raise ValueError("Starting node must be part of the graph's nodes.")
-        node_lookup = {node._name: node for node in self.nodes}
-        next_node = starting_node.execute(self.events, full_context=context)
-        while len(next_node) > 0:
-            if next_node not in node_lookup:
-                raise ValueError(f"Node {next_node} not found in graph nodes.")
-            for node in self.nodes:
-                if node._name == next_node:
-                    next_node = node.execute(self.events, full_context=context)
-                    break
-        else:
-            print("No next node to run.")
+        context.next_node = starting_node
+        context.running = True
+
+        while context.running == True:
+            next_node = context.next_node
+            if next_node:
+                logging.info(f"In Graph: Context next node: {next_node._name}")
+                context.next_node.execute()
+            else:
+                logging.info("No next node to run.")
+                context.running = False
