@@ -31,6 +31,7 @@ class Graph():
             api_key = os.getenv("AZURE_API_KEY")
             base_url = os.getenv("AZURE_API_ENDPOINT")
             context.client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+            context.model = os.getenv("AZURE_MAIN_MODEL_DEPLOYMENT")
         context.response_id = None
 
     

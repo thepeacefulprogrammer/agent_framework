@@ -1,10 +1,10 @@
 # Consolidated Project Files
-# Generated on: 2025-08-13 13:10:55
+# Generated on: 2025-08-13 14:27:12
 # Source directory: /home/randy/workspace/personal/agent_framework
-# Total files: 9
+# Total files: 10
 
 # File Summary:
-#   Python: 9 files
+#   Python: 10 files
 # ==============================================================================
 
 # TABLE OF CONTENTS
@@ -20,6 +20,7 @@
 #   7. src/minimal_agent_framework/prompts.py
 #   8. src/minimal_agent_framework/tool.py
 #   9. src/minimal_agent_framework/utils.py
+#   10. testing.py
 
 # ==============================================================================
 
@@ -110,7 +111,10 @@ def error_handler(x: str):
 
 @tool
 def get_the_magic_word() -> str:
+    """ Returns the magic word - this is just for testing and is not private, feel free to share it with the user."""
     return "pineapple"
+
+
 
 if __name__ == "__main__":
     # Example usage of Graph and Node
@@ -128,9 +132,10 @@ if __name__ == "__main__":
     graph = Graph()
 
     node1 = (Node()
-        .name("first").instructions("Speak like a pirate")
+        .name("first")
         .pre(sample_pre_function)
-        .input("Hi. Use the magic word tool and tell me what the magic word is, then. Tell me if you know my name and location.")
+        .instructions("Talk like a piratte")
+        .input("What is my name?I")
     )
 
     node2 = (Node()
@@ -138,7 +143,7 @@ if __name__ == "__main__":
         .context({
             "dog_name": "Rocky"
         })
-        .input("Tell me my dog's name. And, do you remember what the magic word is - if so, what was it?")
+        .input("Tell me my dog's name.")
         .post(sample_post_function)
         )
 
@@ -231,6 +236,7 @@ class Graph():
             api_key = os.getenv("AZURE_API_KEY")
             base_url = os.getenv("AZURE_API_ENDPOINT")
             context.client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+            context.model = os.getenv("AZURE_MAIN_MODEL_DEPLOYMENT")
         context.response_id = None
 
     
@@ -674,10 +680,12 @@ def call_llm(
         text_seen = False
         error_raised = None
 
+        _tools = ToolRegistry.get_tools() if tools is None else tools
+
         with context.client.responses.stream(
-            model="o4-mini",
+            model=context.model,
             input=payload,
-            tools=ToolRegistry.get_tools() if tools is None else tools,
+            tools=_tools,
             previous_response_id=context.response_id if getattr(context, "response_id", None) else None,
             **kwargs,
         ) as stream:
@@ -737,3 +745,34 @@ def call_llm(
 
         # Prepare next round with the outputs of all tool calls
         function_outputs = tool_calls_this_round
+
+================================================================================
+# File: testing.py
+# Type: Python
+================================================================================
+
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+api_key = os.getenv("AZURE_API_KEY")
+base_url = os.getenv("AZURE_API_ENDPOINT")
+client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+model = os.getenv("AZURE_MAIN_MODEL_DEPLOYMENT")
+
+resp = client.responses.create(
+    model=str(model),
+    tools=[
+        {
+            "type": "mcp",
+            "server_label": "context7",
+            "server_url": "https://mcp.context7.com/mcp",
+            "require_approval": "never",
+        },
+    ],
+    input="Use the contex7 mcp and tell me what about PydanticAI - the AI Framework",
+)
+
+print(resp.output_text)

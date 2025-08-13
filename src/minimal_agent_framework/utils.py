@@ -77,10 +77,12 @@ def call_llm(
         text_seen = False
         error_raised = None
 
+        _tools = ToolRegistry.get_tools() if tools is None else tools
+
         with context.client.responses.stream(
-            model="o4-mini",
+            model=context.model,
             input=payload,
-            tools=ToolRegistry.get_tools() if tools is None else tools,
+            tools=_tools,
             previous_response_id=context.response_id if getattr(context, "response_id", None) else None,
             **kwargs,
         ) as stream:

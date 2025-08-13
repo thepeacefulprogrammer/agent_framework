@@ -1,4 +1,4 @@
-from src.minimal_agent_framework import Graph, Node, EventEmitter, tool, context, context_reset
+from src.minimal_agent_framework import Graph, Node, EventEmitter, tool, context, context_reset, maf_tools
 import logging
 from dotenv import load_dotenv
 
@@ -34,7 +34,10 @@ def error_handler(x: str):
 
 @tool
 def get_the_magic_word() -> str:
+    """ Returns the magic word - this is just for testing and is not private, feel free to share it with the user."""
     return "pineapple"
+
+
 
 if __name__ == "__main__":
     # Example usage of Graph and Node
@@ -52,9 +55,9 @@ if __name__ == "__main__":
     graph = Graph()
 
     node1 = (Node()
-        .name("first").instructions("Speak like a pirate")
+        .name("first")
         .pre(sample_pre_function)
-        .input("Hi. Use the magic word tool and tell me what the magic word is, then. Tell me if you know my name and location.")
+        .input("Search the web for information on outer space.")
     )
 
     node2 = (Node()
@@ -62,7 +65,7 @@ if __name__ == "__main__":
         .context({
             "dog_name": "Rocky"
         })
-        .input("Tell me my dog's name. And, do you remember what the magic word is - if so, what was it?")
+        .input("Tell me my dog's name.")
         .post(sample_post_function)
         )
 
