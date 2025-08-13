@@ -5,7 +5,7 @@ from openai.types.responses import (
 from typing import cast
 
 import json
-from typing import Callable, Type, Optional
+from typing import Callable, Type, Optional, Any
 from .tool import ToolRegistry
 from .ctx import context
 from pydantic import BaseModel
@@ -37,6 +37,8 @@ def call_llm(
     input: str | list,
     instructions: Optional[str] = None,
     output: Optional[Type[BaseModel]] = None,
+    tools: Optional[list[Any]] = None,
+    tool_choice: Optional[Any] = None,
     max_round_trips: int = 6,
 ):
     """
@@ -55,6 +57,8 @@ def call_llm(
         kwargs["text_format"] = output
     if instructions:
         kwargs["instructions"] = instructions
+    if tool_choice:
+        kwargs["tool_choice"] = tool_choice
 
     round_trip = 0
     function_outputs = []  # carry function outputs between rounds
@@ -76,7 +80,7 @@ def call_llm(
         with context.client.responses.stream(
             model="o4-mini",
             input=payload,
-            tools=ToolRegistry.get_tools(),
+            tools=ToolRegistry.get_tools() if tools is None else tools,
             previous_response_id=context.response_id if getattr(context, "response_id", None) else None,
             **kwargs,
         ) as stream:

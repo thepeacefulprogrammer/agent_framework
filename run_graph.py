@@ -1,4 +1,4 @@
-from src.minimal_agent_framework import Graph, Node, EventEmitter, tool, context
+from src.minimal_agent_framework import Graph, Node, EventEmitter, tool, context, context_reset
 import logging
 from dotenv import load_dotenv
 
@@ -55,14 +55,14 @@ if __name__ == "__main__":
         .name("first").instructions("Speak like a pirate")
         .pre(sample_pre_function)
         .input("Hi. Use the magic word tool and tell me what the magic word is, then. Tell me if you know my name and location.")
-        .post(change_my_name, ["Ted"]))
+    )
 
     node2 = (Node()
         .name("second")
         .context({
             "dog_name": "Rocky"
         })
-        .input("Tell me my dog's name")
+        .input("Tell me my dog's name. And, do you remember what the magic word is - if so, what was it?")
         .post(sample_post_function)
         )
 

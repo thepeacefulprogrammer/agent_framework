@@ -42,6 +42,14 @@ class ToolRegistry:
         return [cls._schemas[name] for name in cls._order]
 
     @classmethod
+    def get_tools_subset(cls, names: list[str]) -> list[Any]:
+        return [cls._schemas[n] for n in names if n in cls._schemas]
+
+    @classmethod
+    def has_tool(cls, name: str) -> bool:
+        return name in cls._schemas
+
+    @classmethod
     def call(cls, name: str, args: Any) -> Any:
         """Invoke a registered tool by name with dict or JSON-encoded args."""
         if name not in cls._funcs:

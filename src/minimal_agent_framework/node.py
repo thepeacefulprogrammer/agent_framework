@@ -4,6 +4,7 @@ from .utils import call_llm
 from .ctx import context
 from .prompts import instructions as base_instructions
 from uuid import uuid4
+from .tool import ToolRegistry
 
 class Node():
     def __init__(self):
@@ -50,6 +51,7 @@ class Node():
     
     def execute(self):
         logging.info(f"Executing node: {self._name}")
+        context.response_id = None
 
         if self._pre_func:
             logging.debug(f"Running pre-function for node: {self._name}")
@@ -87,6 +89,26 @@ class Node():
             call_llm(self._input, instructions=instructions)
         else:
             call_llm(input="Follow your instructions", instructions=instructions)
+
+        if self._routes and getattr(context, "next_node", None) is None:
+            logging.info("Route not chosen; enforcing route selection.")
+            enforce_instructions = (
+                "Now choose the next node. You must call the 'route' tool exactly once with "
+                "next_node_id and rationale, and produce no other text.\n\n"
+                "Candidates:\n" + route_info
+            )
+            if ToolRegistry.has_tool("route"):
+                try:
+                    call_llm(
+                        input="",
+                        instructions=enforce_instructions,
+                        tools=ToolRegistry.get_tools_subset(["route"]),
+                        tool_choice="required",
+                    )
+                except Exception as e:
+                    logging.warning(f"Route enforcement failed: {e}")
+
+        
 
         if self._post_func:
             logging.debug(f"Running post-function for node: {self._name}")
