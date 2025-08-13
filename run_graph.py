@@ -26,6 +26,12 @@ def text_handler(x: str):
 def tool_call_handler(x: str):
     print(f"\n🛠️  Tool Called: {x}\n")
 
+def tool_result_handler(x: str):
+    print(f"Tool result: {x}")
+
+def error_handler(x: str):
+    print(f"Error raised: {x}")
+
 @tool
 def get_the_magic_word() -> str:
     return "pineapple"
@@ -36,6 +42,8 @@ if __name__ == "__main__":
     events = EventEmitter()
     events.on("text", text_handler)
     events.on("tool_call", tool_call_handler)
+    events.on("tool_result", tool_result_handler)
+    events.on("error", error_handler)
 
     context.name = "Randy"
     context.location = "Earth"
@@ -54,7 +62,7 @@ if __name__ == "__main__":
         .context({
             "dog_name": "Rocky"
         })
-        .input("Do yoy know my dog's name? How about my name?")
+        .input("Tell me my dog's name")
         .post(sample_post_function)
         )
 

@@ -1,5 +1,7 @@
 
-instructions = """
+instructions = ""
+
+instructions_old = """
 Agent operating guide (for this runtime)
 - Role
   - You are executing inside a node of a directed graph. In each node you:

@@ -6,20 +6,22 @@ import os
 from openai import OpenAI
 
 @tool
-def route(to_node_id: str, rationale: str):
+def route(next_node_id: str, rationale: str):
     """
     Route to the next node:
 
     Arguments:
 
-    to_node: the id of the node to route to
+    next_node_id: the id of the node to route to
     rationale: the reason for choosing this node to route to
     """
     nodes = context.nodes
-    to_node = next((n for n in nodes if n._id == to_node_id), None)
-    context.next_node = to_node
-
-    return "success"
+    next_node = next((n for n in nodes if n._id == next_node_id), None)
+    if next_node:
+        context.next_node = next_node
+        return f"success: routing to {next_node._name} with rationale: {rationale}"
+    else:
+        return "failure"
 
 class Graph():
     def __init__(self):
@@ -56,6 +58,7 @@ class Graph():
         while context.running == True:
             next_node = context.next_node
             if next_node:
+                print(f"\n\n===== Starting node: {next_node._name}")
                 logging.info(f"In Graph: Context next node: {next_node._name}")
                 context.next_node.execute()
             else:
