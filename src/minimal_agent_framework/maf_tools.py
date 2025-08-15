@@ -93,7 +93,6 @@ def format_duckduckgo_results(results: list[dict[str, Any]]) -> dict[Any, Any]:
     return response
 
 
-
 ### file tools
 
 @tool
@@ -285,3 +284,90 @@ def execute_shell_command(command: str) -> dict[str, Any]:
         return {"status": "error", "message": f"Command timed out"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# plan tools
+from .ctx import context
+from pydantic import BaseModel
+from enum import Enum, auto
+from uuid import uuid4
+from typing import Optional
+
+class Status(Enum):
+    PENDING = auto()
+    IN_PROGRESS = auto()
+    DONE = auto()
+
+class ToDo(BaseModel):
+    id: str
+    name: str
+    description: str
+    notes: list[str]
+    status: Status
+
+def _get_todos() -> list[ToDo]:
+    """Internal helper function to get list of todos"""
+    if getattr(context, "todos", None) is None:
+        context.todos = []
+    return context.todos
+
+def _get_todo(id: str) -> ToDo | None:
+    """Internal helper function to get a todo by its id"""
+    todos = _get_todos()
+    for todo in todos:
+        if todo.id == id:
+            return todo
+    return None
+
+@tool
+def get_todos() -> str:
+    """Returns the list of todos as a string.
+    """
+    todos = _get_todos()
+    todos_as_str = "TODO List:\n"
+    for todo in todos:
+        todos_as_str += f"[ id: {todo.id} ] Name: {todo.name}\n{todo.description}\nStatus: {todo.status}"
+        pass
+    return todos_as_str
+
+@tool
+def create_todo(name: str, description: str) -> str:
+    """Creates a new todo with the name and description provided and sets status to PENDING"""
+
+    todo : ToDo = ToDo(id=uuid4().hex, name=name, description=description, status=Status.PENDING, notes=[])
+    todos = _get_todos()
+    todos.append(todo)
+    return f"success, created {todo} and added it to the todos list. There are now {len(todos)} todos"
+
+
+@tool
+def update_todo(id: str, new_name: Optional[str], new_description: Optional[str], new_status: Optional[Status]) -> str:
+    if new_name is None and new_description is None and new_status is None:
+        return "Failed to edit todo: must contain at least one of new_name, new_description, or new_status"
+
+    todo_to_edit = _get_todo(id)
+    
+    if todo_to_edit is None:
+        return f"Failed: todo {id} not found in todos list"
+
+    if new_name:
+        todo_to_edit.name = new_name
+    
+    if new_description:
+        todo_to_edit.description = new_description
+
+    if new_status:
+        todo_to_edit.status = new_status
+
+    return f"success: todo {id} updated"
+
+@tool
+def delete_todo(id: str):
+    todo_to_delete = _get_todo(id)
+    if todo_to_delete is None:
+        return f"Failed: todo {id} not found in todos list."
+    todos = _get_todos()
+    todos.remove(todo_to_delete)
+    return f"success todo {id} deleted."
+
+
