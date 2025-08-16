@@ -34,7 +34,6 @@ class Graph():
             context.model = os.getenv("AZURE_MAIN_MODEL_DEPLOYMENT")
         context.response_id = None
 
-    
     def add(self, node: Node) -> 'Graph':
         if not isinstance(node, Node):
             raise TypeError("Node must be an instance of Node.")
@@ -47,7 +46,7 @@ class Graph():
                 raise TypeError("All items must be instances of Node.")
             context.nodes.append(node)
         return self
-    
+
     def run(self, starting_node: Node):
         if not context.nodes:
             raise RuntimeError("Graph has no nodes to run.")
@@ -55,13 +54,20 @@ class Graph():
             raise ValueError("Starting node must be part of the graph's nodes.")
         context.next_node = starting_node
         context.running = True
+        context.paused = False
 
-        while context.running == True:
+        while context.running is True:
             next_node = context.next_node
             if next_node:
                 print(f"\n\n===== Starting node: {next_node._name}")
                 logging.info(f"In Graph: Context next node: {next_node._name}")
-                context.next_node.execute()
+                try:
+                    context.next_node.execute()
+                except KeyboardInterrupt:
+                    logging.info("KeyboardInterrupt caught in Graph.run; pausing.")
+                    context.paused = True
+                    context.running = False
+                    break
             else:
                 logging.info("No next node to run.")
                 context.running = False

@@ -1,0 +1,244 @@
+{
+  "parents": [
+    {
+      "id": "P-setup",
+      "title": "Project setup & environment",
+      "description": "Initialize repository, create virtual environment, add pygame dependency, set up project structure and basic README.",
+      "status": "PENDING",
+      "children": []
+    },
+    {
+      "id": "P-core",
+      "title": "Game engine & core loop",
+      "description": "Implement main game loop, screen initialization, fixed timestep, and frame handling using pygame.",
+      "status": "PENDING",
+      "children": []
+    },
+    {
+      "id": "P-gameplay",
+      "title": "Gameplay mechanics",
+      "description": "Implement snake movement, growth, food spawning, collision detection (walls and self), scoring, and speed progression.",
+      "status": "PENDING",
+      "children": []
+    },
+    {
+      "id": "P-ui",
+      "title": "UI, menus & controls",
+      "description": "Create start screen, pause, game over screens, in-game HUD (score), settings for controls and difficulty, and keyboard/gamepad input handling.",
+      "status": "PENDING",
+      "children": []
+    },
+    {
+      "id": "P-testing-packaging",
+      "title": "Testing, polish & distribution",
+      "description": "Add unit/integration tests, playtesting, bug fixes, package into executable (PyInstaller), and write usage instructions.",
+      "status": "PENDING",
+      "children": []
+    }
+  ],
+  "tasks": [
+    {
+      "parent_id": "P-setup",
+      "title": "Scaffold repository & project layout",
+      "kind": "build",
+      "status": "DONE",
+      "test_cmd": "pytest -q tests/test_scaffold.py::test_project_structure",
+      "relevant_files": [
+        "README.md",
+        "pyproject.toml",
+        "src/snake_game/__init__.py",
+        "tests/test_scaffold.py"
+      ],
+      "notes": "TDD: add failing test asserting files/dirs exist (Red).",
+      "id": "T-f7f1543f"
+    },
+    {
+      "parent_id": "P-setup",
+      "title": "Add virtualenv, dependency management and CI config",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_setup_env.py::test_requirements_listed",
+      "relevant_files": [
+        "requirements.txt",
+        ".github/workflows/ci.yml"
+      ],
+      "notes": "Create requirements.txt with pygame and basic CI workflow that runs tests.",
+      "id": "T-610c36fa"
+    },
+    {
+      "parent_id": "P-setup",
+      "title": "Configure pytest and basic test harness",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q",
+      "relevant_files": [
+        "pyproject.toml",
+        "pytest.ini",
+        "tests/"
+      ],
+      "notes": "Add pytest configuration and example failing test to drive development.",
+      "id": "T-1931d155"
+    },
+    {
+      "parent_id": "P-core",
+      "title": "Implement main loop skeleton and app entrypoint",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_core.py::test_main_loop_returns_after_quit",
+      "relevant_files": [
+        "src/snake_game/main.py",
+        "tests/test_core.py"
+      ],
+      "notes": "TDD: write a test that starts main loop and simulates quit (Red).",
+      "id": "T-ca389115"
+    },
+    {
+      "parent_id": "P-core",
+      "title": "Screen initialization & fixed timestep handling",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_core.py::test_fixed_timestep",
+      "relevant_files": [
+        "src/snake_game/display.py",
+        "tests/test_core.py"
+      ],
+      "notes": "Expose timestep step function and test deterministic progression.",
+      "id": "T-126e95ec"
+    },
+    {
+      "parent_id": "P-core",
+      "title": "Input handling abstraction (keyboard/gamepad)",
+      "kind": "refactor",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_input.py::test_input_events_mapped",
+      "relevant_files": [
+        "src/snake_game/input.py",
+        "tests/test_input.py"
+      ],
+      "notes": "Start with tests mapping pygame events to actions (Red).",
+      "id": "T-1313d70d"
+    },
+    {
+      "parent_id": "P-gameplay",
+      "title": "Snake movement & turning mechanics",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_snake.py::test_snake_moves_forward",
+      "relevant_files": [
+        "src/snake_game/snake.py",
+        "tests/test_snake.py"
+      ],
+      "notes": "TDD: failing tests for movement and turn queuing.",
+      "id": "T-1935cb78"
+    },
+    {
+      "parent_id": "P-gameplay",
+      "title": "Food spawning and consumption (growth)",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_food.py::test_food_spawns_not_on_snake",
+      "relevant_files": [
+        "src/snake_game/food.py",
+        "tests/test_food.py"
+      ],
+      "notes": "Test deterministic spawn in seeded RNG for Red->Green cycle.",
+      "id": "T-5d0daaef"
+    },
+    {
+      "parent_id": "P-gameplay",
+      "title": "Collision detection: walls and self",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_collision.py::test_self_collision_triggers_game_over",
+      "relevant_files": [
+        "src/snake_game/collision.py",
+        "tests/test_collision.py"
+      ],
+      "notes": "Add failing tests first to drive collision logic.",
+      "id": "T-9f37a583"
+    },
+    {
+      "parent_id": "P-ui",
+      "title": "Start, pause and game over screens",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_ui.py::test_start_screen_shown",
+      "relevant_files": [
+        "src/snake_game/ui.py",
+        "tests/test_ui.py"
+      ],
+      "notes": "TDD: tests assert state transitions show correct screens.",
+      "id": "T-9de6370b"
+    },
+    {
+      "parent_id": "P-ui",
+      "title": "In-game HUD: score & FPS display",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_hud.py::test_score_updates_on_eat",
+      "relevant_files": [
+        "src/snake_game/hud.py",
+        "tests/test_hud.py"
+      ],
+      "notes": "Start with failing tests for score increment on food consumption.",
+      "id": "T-80176ecb"
+    },
+    {
+      "parent_id": "P-ui",
+      "title": "Controls & settings menu (keyboard/gamepad)",
+      "kind": "refactor",
+      "status": "PENDING",
+      "test_cmd": "pytest -q tests/test_controls.py::test_control_mapping_persistent",
+      "relevant_files": [
+        "src/snake_game/settings.py",
+        "tests/test_controls.py"
+      ],
+      "notes": "TDD to allow configurable controls and difficulty presets.",
+      "id": "T-4016b7c5"
+    },
+    {
+      "parent_id": "P-testing-packaging",
+      "title": "Add unit & integration tests suite",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q",
+      "relevant_files": [
+        "tests/",
+        "tox.ini",
+        ".github/workflows/ci.yml"
+      ],
+      "notes": "Create comprehensive tests covering core, gameplay and UI. Start by adding failing tests (Red).",
+      "id": "T-e5b72655"
+    },
+    {
+      "parent_id": "P-testing-packaging",
+      "title": "Set up CI to run tests and linters",
+      "kind": "build",
+      "status": "PENDING",
+      "test_cmd": "pytest -q && flake8 src tests",
+      "relevant_files": [
+        ".github/workflows/ci.yml"
+      ],
+      "notes": "CI ensures tests run on push and PRs.",
+      "id": "T-f31a521a"
+    },
+    {
+      "parent_id": "P-testing-packaging",
+      "title": "Packaging and distribution (PyInstaller)",
+      "kind": "docs",
+      "status": "PENDING",
+      "test_cmd": null,
+      "relevant_files": [
+        "pyinstaller.spec",
+        "README.md"
+      ],
+      "notes": "Write docs and build script to produce executables for platforms.",
+      "id": "T-379a1055"
+    }
+  ],
+  "current": {
+    "subtask_id": "T-610c36fa"
+  },
+  "created_at": "2025-08-16T01:20:46.888793",
+  "updated_at": "2025-08-16T01:26:24.099263"
+}

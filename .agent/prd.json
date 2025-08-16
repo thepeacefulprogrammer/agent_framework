@@ -1,0 +1,63 @@
+{
+  "id": "prd-untitled",
+  "title": "Snake \u2014 Pygame Implementation (Prototype)",
+  "overview": "A small, classic Snake game implemented in Python using pygame as a learning project and a playable prototype for local desktop environments.",
+  "goals": [
+    "Deliver a playable, responsive Snake game using pygame",
+    "Keep the codebase small and well-documented for learning and extension",
+    "Provide simple configuration (window size, speed) and an easy run/install path"
+  ],
+  "functional_requirements": [
+    "Grid-based movement with discrete time steps",
+    "Player controls the snake with keyboard (arrow keys/WASD)",
+    "Food spawns at random empty grid cells; eating food increases snake length and score",
+    "Collision detection ends the game when the snake hits walls or itself",
+    "Display current score and high score during play",
+    "Basic UI: start screen, in-game HUD, pause, game-over screen with restart option",
+    "Configurable game speed (difficulty) and window size via a simple config or constants",
+    "Run on Python 3.8+ with pygame (specify version) and include a requirements file"
+  ],
+  "non_goals": [
+    "No multiplayer or networking features",
+    "No advanced level editor or procedural levels",
+    "No mobile/touch-specific UI (desktop-focused)",
+    "No complex asset pipeline; use simple sprites or shapes"
+  ],
+  "user_stories": [
+    "As a player, I can move the snake to collect food so I can increase my score",
+    "As a player, I can see my current score and the high score",
+    "As a player, I can pause and restart the game after game over",
+    "As a developer, I can run the game locally with a single command and read the code to learn",
+    "As a tester, I can adjust speed and grid size to validate behavior at different difficulties"
+  ],
+  "success_metrics": [
+    "Playable without crashes for a continuous 10-minute manual play session",
+    "Core game-logic unit tests for movement, food spawn, and collision pass (>=90% of critical logic covered)",
+    "Startup/run documented and reproducible: pip install -r requirements.txt; python run_game.py",
+    "Responsive input: no noticeable input lag at target FPS (>=30 FPS on typical dev machine)"
+  ],
+  "open_questions": [
+    "Preferred default window/grid size and pixel art vs. simple geometric shapes?",
+    "Target pygame version (recommend latest stable for Python 3.8+)?",
+    "Any required sound assets or can simple beeps suffice (or optional)?",
+    "Should high score persist across sessions (file-based) or be in-memory only?",
+    "Packaging expectations: source-only, a wheel, or a standalone executable?"
+  ],
+  "context": {
+    "repo": "",
+    "test_runner": "pytest",
+    "user_prompt": "make a snake game using pygame",
+    "cwd": "/home/randy/workspace/personal/testing",
+    "constraints": "Keep implementation minimal, desktop-focused, Python 3.8+, use pygame, include run instructions"
+  },
+  "created_at": "2025-08-16T01:19:48.621259",
+  "updated_at": "2025-08-16T01:20:15.560871",
+  "problem": "Create a Snake game using pygame",
+  "primary_user": "Desktop players running the game from Python/pygame",
+  "acceptance_criteria": [
+    "Playable arcade-style snake with levels and power-ups",
+    "Keyboard controls responsive",
+    "Pixel-art visuals + sound",
+    "Runs from source with clear README and dependency instructions"
+  ]
+}

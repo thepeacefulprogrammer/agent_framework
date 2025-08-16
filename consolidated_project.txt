@@ -1,0 +1,1158 @@
+# Consolidated Project Files
+# Generated on: 2025-08-15 11:23:06
+# Source directory: /home/randy/workspace/personal/agent_framework
+# Total files: 11
+
+# File Summary:
+#   Python: 11 files
+# ==============================================================================
+
+# TABLE OF CONTENTS
+# ------------------------------------------------------------------------------
+
+# Python Files:
+#   1. learn_api.py
+#   2. run_graph.py
+#   3. src/minimal_agent_framework/__init__.py
+#   4. src/minimal_agent_framework/ctx.py
+#   5. src/minimal_agent_framework/graph.py
+#   6. src/minimal_agent_framework/maf_tools.py
+#   7. src/minimal_agent_framework/node.py
+#   8. src/minimal_agent_framework/prompts.py
+#   9. src/minimal_agent_framework/tool.py
+#   10. src/minimal_agent_framework/utils.py
+#   11. testing.py
+
+# ==============================================================================
+
+
+################################################################################
+# PYTHON FILES
+################################################################################
+
+================================================================================
+# File: learn_api.py
+# Type: Python
+================================================================================
+
+
+from dotenv import load_dotenv
+from minimal_agent_framework import tool, call_llm, EventEmitter
+from pydantic import BaseModel
+
+import logging
+logging.basicConfig(level=logging.INFO)
+
+for name in ("httpx", "httpcore"):
+    lg = logging.getLogger(name)
+    lg.setLevel(logging.ERROR)
+
+load_dotenv()
+
+@tool
+def add_numbers(a: int, b: int) -> int:
+    """Add two numbers together."""
+    return a + b
+
+class OutputTest(BaseModel):
+    """Test output model."""
+    output_process_used: str
+    output_text: str
+
+def handler(x: str):
+    print(f"{x}", end='', flush=True)
+
+
+if __name__ == "__main__":
+
+    events = EventEmitter()
+    events.on("text", handler)
+
+    response = call_llm(input="use the add_numbers tool to add 5 and 3, and then use it again to add 10 and 20. Respond with the output text that will be seen by the user, and also return the process used to generate the output.", events=events)    
+
+
+================================================================================
+# File: run_graph.py
+# Type: Python
+================================================================================
+
+from src.minimal_agent_framework import Graph, Node, EventEmitter, tool, context, context_reset, maf_tools
+import logging
+from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO)
+
+for name in ("httpx", "httpcore"):
+    lg = logging.getLogger(name)
+    lg.setLevel(logging.ERROR)
+
+load_dotenv()
+
+def sample_pre_function():
+    logging.debug("Pre-function executed")
+
+def sample_post_function():
+    logging.debug("Post-function executed")
+
+def change_my_name(name: str):
+    context.name = name
+
+
+def text_handler(x: str):
+    print(f"{x}", end='', flush=True)
+
+def tool_call_handler(x: str):
+    print(f"\n🛠️  Tool Called: {x}\n")
+
+def tool_result_handler(x: str):
+    print(f"Tool result: {x}")
+
+def error_handler(x: str):
+    print(f"Error raised: {x}")
+
+@tool
+def get_the_magic_word() -> str:
+    """ Returns the magic word - this is just for testing and is not private, feel free to share it with the user."""
+    return "pineapple"
+
+
+
+if __name__ == "__main__":
+    # Example usage of Graph and Node
+    
+    events = EventEmitter()
+    events.on("text", text_handler)
+    events.on("tool_call", tool_call_handler)
+    events.on("tool_result", tool_result_handler)
+    events.on("error", error_handler)
+
+    context.name = "Randy"
+    context.location = "Earth"
+    context.events = events
+
+    graph = Graph()
+
+    node1 = (Node()
+        .name("first")
+        .pre(sample_pre_function)
+        .instructions("You will create a top level plan")
+        .input("Search the web for information on outer space.")
+    )
+
+    node2 = (Node()
+        .name("second")
+        .context({
+            "dog_name": "Rocky"
+        })
+        .input("Tell me my dog's name.")
+        .post(sample_post_function)
+        )
+
+    node3 = (Node()
+        .name("third")
+        .input("Do you know my name now?")
+        .post(sample_post_function)
+        )
+    
+    node1.routes({
+        node2._id: "the magic word was pineapple",
+        node3._id: "the magic word was grape",
+        })
+    
+    node2.routes({
+        node3._id: "default route",
+        })
+    
+    logging.debug("Adding nodes to graph")
+    graph.add_nodes([node1, node2, node3])
+    
+    graph.run(node1)
+
+================================================================================
+# File: src/minimal_agent_framework/__init__.py
+# Type: Python
+================================================================================
+
+from .graph import Graph
+from .node import Node
+from .tool import tool, ToolRegistry
+from .utils import call_llm, EventEmitter
+from .ctx import context, reset as context_reset
+
+__all__ = ['Graph', 'Node', 'tool', 'ToolRegistry', 'call_llm', 'EventEmitter', 'context', 'context_reset']
+
+================================================================================
+# File: src/minimal_agent_framework/ctx.py
+# Type: Python
+================================================================================
+
+from types import SimpleNamespace
+
+context = SimpleNamespace()
+
+def reset():
+    keep = ("events", "running")
+    d = context.__dict__
+    for k in list(d):
+        if k not in keep:
+            del d[k]
+
+
+
+================================================================================
+# File: src/minimal_agent_framework/graph.py
+# Type: Python
+================================================================================
+
+from .node import Node
+from .ctx import context
+import logging
+from .tool import tool
+import os
+from openai import OpenAI
+
+@tool
+def route(next_node_id: str, rationale: str):
+    """
+    Route to the next node:
+
+    Arguments:
+
+    next_node_id: the id of the node to route to
+    rationale: the reason for choosing this node to route to
+    """
+    nodes = context.nodes
+    next_node = next((n for n in nodes if n._id == next_node_id), None)
+    if next_node:
+        context.next_node = next_node
+        return f"success: routing to {next_node._name} with rationale: {rationale}"
+    else:
+        return "failure"
+
+class Graph():
+    def __init__(self):
+        if getattr(context, "nodes", None) is None:
+            context.nodes = []
+        if getattr(context, "client", None) is None:
+            api_key = os.getenv("AZURE_API_KEY")
+            base_url = os.getenv("AZURE_API_ENDPOINT")
+            context.client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+            context.model = os.getenv("AZURE_MAIN_MODEL_DEPLOYMENT")
+        context.response_id = None
+
+    
+    def add(self, node: Node) -> 'Graph':
+        if not isinstance(node, Node):
+            raise TypeError("Node must be an instance of Node.")
+        context.nodes.append(node)
+        return self
+
+    def add_nodes(self, nodes: list[Node]) -> 'Graph':
+        for node in nodes:
+            if not isinstance(node, Node):
+                raise TypeError("All items must be instances of Node.")
+            context.nodes.append(node)
+        return self
+    
+    def run(self, starting_node: Node):
+        if not context.nodes:
+            raise RuntimeError("Graph has no nodes to run.")
+        if starting_node not in context.nodes:
+            raise ValueError("Starting node must be part of the graph's nodes.")
+        context.next_node = starting_node
+        context.running = True
+
+        while context.running == True:
+            next_node = context.next_node
+            if next_node:
+                print(f"\n\n===== Starting node: {next_node._name}")
+                logging.info(f"In Graph: Context next node: {next_node._name}")
+                context.next_node.execute()
+            else:
+                logging.info("No next node to run.")
+                context.running = False
+
+================================================================================
+# File: src/minimal_agent_framework/maf_tools.py
+# Type: Python
+================================================================================
+
+import os
+import sys
+import requests
+import json
+import subprocess
+import shutil
+
+from .tool import tool
+from typing import Any
+from ddgs import DDGS
+from dotenv import load_dotenv
+from datetime import datetime
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+load_dotenv()
+
+BRAVE_SEARCH_API_KEY = os.getenv("BRAVE_SEARCH_API_KEY")
+BRAVE_SEARCH_API_WEB_ENDPOINT = os.getenv("BRAVE_SEARCH_API_WEB_ENDPOINT")
+
+if BRAVE_SEARCH_API_KEY is None:
+    raise ValueError("BRAVE_SEARCH_API_KEY is not set")
+if BRAVE_SEARCH_API_WEB_ENDPOINT is None:
+    raise ValueError("BRAVE_SEARCH_API_WEB_ENDPOINT is not set")
+
+BUFFER = 0.05 # 5% buffer
+MAX_QUERY_LENGTH = int(400 * (1 - BUFFER))
+MAX_QUERY_WORDS = int(50 * (1 - BUFFER))
+MAX_RESULTS = 5
+
+
+@tool
+def search(query: str, max_results: int = MAX_RESULTS) -> str:
+    """Search the web for a query using DuckDuckGo."""
+    
+    duckduckgo_results = search_duckduckgo(query, max_results)
+    brave_results = search_brave(query, max_results)
+    return json.dumps({**duckduckgo_results, **brave_results})
+
+
+def search_duckduckgo(query: str, max_results: int = MAX_RESULTS) -> dict[Any, Any]:
+    """Search the web for a query using DuckDuckGo."""
+    try:
+        results = DDGS().text(query, max_results=max_results)
+        return format_duckduckgo_results(results)
+    except Exception as e:
+        return {"error": str(e)}
+
+def search_brave(query: str, max_results: int = MAX_RESULTS) -> dict[Any, Any]:
+    """Search the web for a query using Brave Search."""
+    try:
+        # ensure query is no more than 400 characters
+        if len(query) > MAX_QUERY_LENGTH:
+            query = str(query[:MAX_QUERY_LENGTH - 3] + "...")
+        
+        # ensure query is no more than 50 words
+        if len(query.split()) > MAX_QUERY_WORDS:
+            query = str(" ".join(query.split()[:MAX_QUERY_WORDS - 1]) + "...")
+
+        
+        assert BRAVE_SEARCH_API_WEB_ENDPOINT is not None
+        response = requests.get(BRAVE_SEARCH_API_WEB_ENDPOINT, params={"q": query, "search_lang": "en", "count": str(max_results), "summary": "true"}, 
+                                headers={"X-Subscription-Token": BRAVE_SEARCH_API_KEY,
+                                         "Accept": "application/json",
+                                         "Accept-Encoding": "gzip"})
+        return format_brave_results(response.json())
+    except Exception as e:
+        return {"error": str(e)}
+
+def format_brave_results(result: dict[str, Any]) -> dict[Any, Any]:
+    web_results = result["web"]["results"]
+    response = {}
+    for result in web_results:
+        title = result["title"]
+        description = result["description"]
+        url = result["url"] 
+        response[url] = {
+            "title": title,
+            "description": description,
+        }
+    return response
+
+def format_duckduckgo_results(results: list[dict[str, Any]]) -> dict[Any, Any]:
+    response = {}
+    for result in results:
+        title = result["title"]
+        description = result["body"]
+        url = result["href"]
+        response[url] = {
+            "title": title,
+            "description": description,
+        }
+    return response
+
+
+### file tools
+
+@tool
+def read_file_content(file_path: str) -> dict[str, Any]:
+    """Read and return file contents."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+        return {
+            "status": "success",
+            "file_path": file_path,
+            "content": content,
+            "size": len(content)
+        }
+    except FileNotFoundError:
+        return {"status": "error", "message": f"File not found: {file_path}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Error reading file: {str(e)}"}
+
+@tool
+def write_file(file_path: str, content: str) -> dict[str, Any]:
+    """Write content to a file (overwrites existing content)."""
+    try:
+        # Create directory if it doesn't exist
+        directory = os.path.dirname(file_path)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(content)
+        return {
+            "status": "success",
+            "file_path": file_path,
+            "message": "File written successfully",
+            "size": len(content)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error writing file: {str(e)}"}
+
+@tool
+def append_to_file(file_path: str, content: str) -> dict[str, Any]:
+    """Append content to the end of a file."""
+    try:
+        with open(file_path, 'a', encoding='utf-8') as file:
+            file.write(content)
+        return {
+            "status": "success",
+            "file_path": file_path,
+            "message": "Content appended successfully"
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error appending to file: {str(e)}"}
+
+@tool
+def replace_in_file(file_path: str, search_pattern: str, replacement: str) -> dict[str, Any]:
+    """Replace all occurrences of a pattern in a file."""    
+    try:
+        # Read the file
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+        
+        # Count replacements
+        count = content.count(search_pattern)
+        
+        # Replace content
+        new_content = content.replace(search_pattern, replacement)
+        
+        # Write back
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(new_content)
+        
+        return {
+            "status": "success",
+            "file_path": file_path,
+            "replacements_made": count,
+            "message": f"Replaced {count} occurrences"
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error replacing content: {str(e)}"}
+
+@tool
+def delete_lines_from_file(file_path: str, line_numbers: list[int]) -> dict[str, Any]:
+    """Delete specific lines from a file by line numbers (1-indexed)."""    
+    try:
+        # Read all lines
+        with open(file_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        
+        # Convert to 0-indexed and sort in reverse order
+        line_numbers_0indexed = sorted([ln - 1 for ln in line_numbers], reverse=True)
+        
+        # Remove lines
+        removed_count = 0
+        for line_num in line_numbers_0indexed:
+            if 0 <= line_num < len(lines):
+                del lines[line_num]
+                removed_count += 1
+        
+        # Write back
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.writelines(lines)
+        
+        return {
+            "status": "success",
+            "file_path": file_path,
+            "lines_removed": removed_count,
+            "total_lines": len(lines)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error deleting lines: {str(e)}"}
+
+@tool
+def insert_at_line(file_path: str, line_number: int, content: str) -> dict[str, Any]:
+    """Insert content at a specific line number (1-indexed)."""  
+    try:
+        # Read all lines
+        with open(file_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        
+        # Convert to 0-indexed
+        line_index = line_number - 1
+        
+        # Ensure content ends with newline if needed
+        if not content.endswith('\n'):
+            content += '\n'
+        
+        # Insert at the specified position
+        if line_index <= 0:
+            lines.insert(0, content)
+        elif line_index >= len(lines):
+            lines.append(content)
+        else:
+            lines.insert(line_index, content)
+        
+        # Write back
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.writelines(lines)
+        
+        return {
+            "status": "success",
+            "file_path": file_path,
+            "inserted_at_line": line_number,
+            "total_lines": len(lines)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error inserting content: {str(e)}"}
+
+@tool
+def create_file_backup(file_path: str) -> dict[str, Any]:
+    """Create a backup of a file with timestamp."""
+    try:
+        if not os.path.exists(file_path):
+            return {"status": "error", "message": "File not found"}
+        
+        # Create backup filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{file_path}.backup_{timestamp}"
+        
+        # Copy file
+        shutil.copy2(file_path, backup_path)
+        
+        return {
+            "status": "success",
+            "message": f"Backup created: {backup_path}"
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error creating backup: {str(e)}"}
+
+
+@tool
+def execute_shell_command(command: str) -> dict[str, Any]:
+    """Execute shell command with timeout."""
+    
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        return {
+            "status": "success",
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "return_code": result.returncode
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "message": f"Command timed out"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# plan tools
+from .ctx import context
+from pydantic import BaseModel
+from enum import Enum, auto
+from uuid import uuid4
+from typing import Optional
+
+class Status(Enum):
+    PENDING = auto()
+    IN_PROGRESS = auto()
+    DONE = auto()
+
+class ToDo(BaseModel):
+    id: str
+    name: str
+    description: str
+    notes: list[str]
+    status: Status
+
+def _get_todos() -> list[ToDo]:
+    """Internal helper function to get list of todos"""
+    if getattr(context, "todos", None) is None:
+        context.todos = []
+    return context.todos
+
+def _get_todo(id: str) -> ToDo | None:
+    """Internal helper function to get a todo by its id"""
+    todos = _get_todos()
+    for todo in todos:
+        if todo.id == id:
+            return todo
+    return None
+
+@tool
+def get_todos() -> str:
+    """Returns the list of todos as a string.
+    """
+    todos = _get_todos()
+    todos_as_str = "TODO List:\n"
+    for todo in todos:
+        todos_as_str += f"[ id: {todo.id} ] Name: {todo.name}\n{todo.description}\nStatus: {todo.status}"
+        pass
+    return todos_as_str
+
+@tool
+def create_todo(name: str, description: str) -> str:
+    """Creates a new todo with the name and description provided and sets status to PENDING"""
+
+    todo : ToDo = ToDo(id=uuid4().hex, name=name, description=description, status=Status.PENDING, notes=[])
+    todos = _get_todos()
+    todos.append(todo)
+    return f"success, created {todo} and added it to the todos list. There are now {len(todos)} todos"
+
+
+@tool
+def update_todo(id: str, new_name: Optional[str], new_description: Optional[str], new_status: Optional[Status]) -> str:
+    if new_name is None and new_description is None and new_status is None:
+        return "Failed to edit todo: must contain at least one of new_name, new_description, or new_status"
+
+    todo_to_edit = _get_todo(id)
+    
+    if todo_to_edit is None:
+        return f"Failed: todo {id} not found in todos list"
+
+    if new_name:
+        todo_to_edit.name = new_name
+    
+    if new_description:
+        todo_to_edit.description = new_description
+
+    if new_status:
+        todo_to_edit.status = new_status
+
+    return f"success: todo {id} updated"
+
+@tool
+def delete_todo(id: str):
+    todo_to_delete = _get_todo(id)
+    if todo_to_delete is None:
+        return f"Failed: todo {id} not found in todos list."
+    todos = _get_todos()
+    todos.remove(todo_to_delete)
+    return f"success todo {id} deleted."
+
+
+
+================================================================================
+# File: src/minimal_agent_framework/node.py
+# Type: Python
+================================================================================
+
+import logging
+from typing import Optional, Callable, Any
+from .utils import call_llm
+from .ctx import context
+from .prompts import instructions as base_instructions
+from uuid import uuid4
+from .tool import ToolRegistry
+
+class Node():
+    def __init__(self):
+        self._id: str = uuid4().hex
+        self._name = ""
+        self._routes: dict[str, str] = {}
+        self._pre_func: dict[str, Any] = {}
+        self._post_func: dict[str, Any] = {}
+        self._base_instructions: str = base_instructions
+        self._input: Optional[str] = None
+        self._local_context: dict[str, str] = {}
+
+    def __str__(self) -> str:
+        return f"\nID: {self._id} Name: {self._name}"
+
+    def context(self, local_context: dict[str, str]) -> 'Node':
+        """Set a context variable only for this node"""
+        self._local_context = local_context
+        return self
+
+    def name(self, name: str) -> 'Node':
+        self._name: str = name
+        return self
+
+    def input(self, input: str) -> 'Node':
+        self._input = input
+        return self
+
+    def instructions(self, specifics: str) -> 'Node':
+        self._base_instructions += f"\nSpecific instructions: {specifics}"
+        return self
+
+    def routes(self, routes: dict[str, str]) -> 'Node':
+        self._routes = routes
+        return self
+    
+    def pre(self, func: Callable, args: list | None = None) -> 'Node':
+        self._pre_func = {"func": func, "args": args}
+        return self
+
+    def post(self, func: Callable, args: list | None = None) -> 'Node':
+        self._post_func = {"func": func, "args": args}
+        return self
+    
+    def execute(self):
+        logging.info(f"Executing node: {self._name}")
+        context.response_id = None
+
+        if self._pre_func:
+            logging.debug(f"Running pre-function for node: {self._name}")
+            args = self._pre_func.get("args", [])
+            if args is None:
+                self._pre_func['func']()
+            else:
+                self._pre_func['func'](*args)
+
+        context_info = "\nContext (key: value)\n"
+        keys_to_skip = ["next_node", "nodes", "running", "events", "client", "response_id"]
+        for key, value in vars(context).items():
+            if key in keys_to_skip:
+                continue
+            else:
+                context_info += f"{key}: {value}\n"
+
+        for key, value in self._local_context.items():
+            context_info += f"{key}: {value}\n"
+
+        instructions = self._base_instructions + context_info
+        
+        route_info = ""
+        for id in self._routes:
+            node = next((n for n in context.nodes if n._id == id), None)
+            if node:
+                route_info += f"{node}: criteria: {self._routes.get(id)}\n"
+
+        if len(self._routes) > 0:
+            instructions += f"\nThe current node is {self._name}. You must decide which node to route to based on the following criteria (node, criteria):\n" + route_info + "\nYou must the route tool to route to the next node, along with your rationale for routing to that node.\n"
+        else:
+            context.running = False
+
+        if self._input:
+            call_llm(self._input, instructions=instructions)
+        else:
+            call_llm(input="Follow your instructions", instructions=instructions)
+
+        if self._routes and getattr(context, "next_node", None) is None:
+            logging.info("Route not chosen; enforcing route selection.")
+            enforce_instructions = (
+                "Now choose the next node. You must call the 'route' tool exactly once with "
+                "next_node_id and rationale, and produce no other text.\n\n"
+                "Candidates:\n" + route_info
+            )
+            if ToolRegistry.has_tool("route"):
+                try:
+                    call_llm(
+                        input="",
+                        instructions=enforce_instructions,
+                        tools=ToolRegistry.get_tools_subset(["route"]),
+                        tool_choice="required",
+                    )
+                except Exception as e:
+                    logging.warning(f"Route enforcement failed: {e}")
+
+        
+
+        if self._post_func:
+            logging.debug(f"Running post-function for node: {self._name}")
+            args = self._post_func.get("args", [])
+            if args is None:
+                self._post_func['func']()
+            else:
+                self._post_func['func'](*args)
+
+================================================================================
+# File: src/minimal_agent_framework/prompts.py
+# Type: Python
+================================================================================
+
+
+instructions = ""
+
+instructions_old = """
+Agent operating guide (for this runtime)
+- Role
+  - You are executing inside a node of a directed graph. In each node you:
+    1) Gather any needed info via tools.
+    2) Produce a clear, user-facing answer.
+    3) Choose the next node by calling the route tool exactly once (if routes are provided).
+
+- Inputs you will see
+  - A user message (input) for this node.
+  - Node-specific instructions (style, constraints).
+  - A “Context (key: value)” section appended below these instructions. Treat it as trusted working memory for this turn. Typical keys include:
+    - user_query: the user's original request for this graph run.
+    - name, location, or other facts set by prior nodes or the host app.
+    - Ignore framework internals like client or events; they are runtime handles, not user data.
+  - A list of candidate routes for the next node, each shown as:
+    ID: <node_id> Name: <node_name>: criteria: <natural-language condition>
+    The node_id is what you must pass to the route tool.
+
+- How to respond in a node
+  1) If you need external information or computation, call domain tools (not route) as many times as needed. Wait for tool results before using them.
+  2) Compose a concise, helpful user-facing answer that:
+     - Uses relevant context keys (e.g., user_query, name).
+     - Does not reveal internal IDs, tool names, or framework mechanics.
+     - Follows any style guidance in these instructions (e.g., “Speak like a pirate”).
+  3) Routing:
+     - If routes are provided, select exactly one next node whose criteria best match the current situation.
+     - Only choose from the listed nodes. Do not invent IDs or names.
+     - Prefer the most specific matching criterion. If none clearly match, use a route marked “default route” (or the most generic fallback).
+     - After you finish the user-facing answer, call the route tool once with:
+       - next_node_id: the chosen node's ID (string from the list).
+       - rationale: a brief, factual reason referencing the criterion you matched.
+     - Do not mention routing, node IDs, or criteria in the user-facing text.
+  4) If there are zero routes, do not call the route tool; just provide the user-facing answer and stop.
+
+- Tool calling rules
+  - Provide arguments that strictly match each tool's schema and types (e.g., numbers as numbers).
+  - After you receive a tool's output, incorporate it into your reasoning and final answer as appropriate.
+  - Never fabricate tool results. If a tool is needed but unavailable, say what you can do and ask a clarifying question.
+
+- Safety and etiquette
+  - Keep explanations brief unless the user explicitly wants depth.
+  - Do not expose internal framework details (IDs, tool names, “Context (key: value)” header, etc.).
+
+
+Operational checklist (follow every node)
+- Use context. Ignore runtime handles like client/events.
+- Use domain tools to get facts or compute.
+- Write the user-facing answer.
+- Pick the single best route from the provided list.
+- Call route(next_node_id: “…”, rationale: “…”) exactly once (if routes exist).
+
+"""
+
+================================================================================
+# File: src/minimal_agent_framework/tool.py
+# Type: Python
+================================================================================
+
+import inspect
+import json
+import logging
+from typing import Any, Callable, Dict, List, Optional, get_type_hints
+
+import openai
+from pydantic import BaseModel, create_model
+
+class ToolRegistry:
+    """Function-only tool registry for OpenAI Responses API."""
+    _funcs: Dict[str, Callable[..., Any]] = {}
+    _schemas: Dict[str, Any] = {}
+    _order: List[str] = []  # preserves registration order
+
+    @classmethod
+    def register(
+        cls,
+        func: Callable[..., Any],
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        replace: bool = False,
+    ) -> Callable[..., Any]:
+        tool_name = name or func.__name__
+        if not replace and tool_name in cls._funcs:
+            raise ValueError(f"Tool '{tool_name}' is already registered.")
+
+        model = _build_model_from_func(func, tool_name, description)
+        tool_schema = openai.pydantic_function_tool(model)
+
+        cls._funcs[tool_name] = func
+        cls._schemas[tool_name] = tool_schema
+        if tool_name not in cls._order:
+            cls._order.append(tool_name)
+
+        logging.debug(f"Registered tool: {tool_name}")
+        return func  # keep original callable behavior
+
+    @classmethod
+    def get_tools(cls) -> List[Any]:
+        """Return tool schemas for Responses API."""
+        return [cls._schemas[name] for name in cls._order]
+
+    @classmethod
+    def get_tools_subset(cls, names: list[str]) -> list[Any]:
+        return [cls._schemas[n] for n in names if n in cls._schemas]
+
+    @classmethod
+    def has_tool(cls, name: str) -> bool:
+        return name in cls._schemas
+
+    @classmethod
+    def call(cls, name: str, args: Any) -> Any:
+        """Invoke a registered tool by name with dict or JSON-encoded args."""
+        if name not in cls._funcs:
+            raise KeyError(f"Tool '{name}' not found. Available: {list(cls._funcs.keys())}")
+
+        fn = cls._funcs[name]
+
+        if isinstance(args, str):
+            try:
+                args = json.loads(args) if args else {}
+            except json.JSONDecodeError:
+                logging.warning(f"Arguments for tool '{name}' not valid JSON; passing raw string")
+        if args is None:
+            args = {}
+        if not isinstance(args, dict):
+            raise TypeError(f"Tool '{name}' expects dict args, got {type(args).__name__}")
+
+        return fn(**args)
+
+    @classmethod
+    def reset(cls):
+        """Clear all registered tools (useful in tests)."""
+        cls._funcs.clear()
+        cls._schemas.clear()
+        cls._order.clear()
+
+
+def tool(
+    func: Optional[Callable[..., Any]] = None,
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    replace: bool = False
+):
+    """
+    Decorator to turn a function into a registered tool.
+
+    @tool
+    def my_tool(a: int) -> str: ...
+
+    @tool(name="custom", description="...", replace=True)
+    def other(...): ...
+    """
+    def _decorator(f: Callable[..., Any]):
+        return ToolRegistry.register(f, name=name, description=description, replace=replace)
+
+    return _decorator if func is None else _decorator(func)
+
+
+def _build_model_from_func(func: Callable[..., Any], model_name: str, description: Optional[str]) -> type[BaseModel]:
+    """
+    Build a Pydantic model from the function signature.
+    - Types come from annotations (supports Annotated[...] with Field(...)).
+    - Defaults come from function defaults.
+    - Zero-arg functions are supported.
+    """
+    sig = inspect.signature(func)
+    # include_extras=True preserves Annotated metadata (e.g., Field)
+    hints = get_type_hints(func, include_extras=True)  # type: ignore[arg-type]
+
+    # Dict[str, Any] helps Pylance not over-constrain kwargs to create_model
+    fields: Dict[str, Any] = {}
+    for param in sig.parameters.values():
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+            raise TypeError(f"@tool does not support *args/**kwargs for '{model_name}'.")
+
+        ann = hints.get(param.name, Any)
+        default = param.default if param.default is not inspect._empty else ...
+        fields[param.name] = (ann, default)
+
+    # Avoid passing __doc__ to create_model; set it after. __module__ is safe.
+    model = create_model(
+        model_name,
+        __module__=func.__module__,
+        **fields,
+    )
+    model.__doc__ = description or (func.__doc__ or "")
+
+    return model
+
+
+================================================================================
+# File: src/minimal_agent_framework/utils.py
+# Type: Python
+================================================================================
+
+from openai.types.responses import (
+    Response,
+    ResponseFunctionToolCall,
+)
+from typing import cast
+
+import json
+from typing import Callable, Type, Optional, Any
+from .tool import ToolRegistry
+from .ctx import context
+from pydantic import BaseModel
+
+class EventEmitter:
+    def __init__(self):
+        self._listeners = {}
+
+    def on(self, event: str, callback: Callable):
+        if event not in self._listeners:
+            self._listeners[event] = []
+        self._listeners[event].append(callback)
+
+    def off(self, event: str, callback: Callable):
+        if event in self._listeners:
+            self._listeners[event] = [cb for cb in self._listeners[event] if cb != callback]
+
+    def emit(self, event: str, *args, **kwargs):
+        if event in self._listeners:
+            for callback in list(self._listeners[event]):
+                callback(*args, **kwargs)
+
+def _serialize_tool_output(result):
+    if isinstance(result, (dict, list)):
+        return json.dumps(result)
+    return str(result)
+
+def call_llm(
+    input: str | list,
+    instructions: Optional[str] = None,
+    output: Optional[Type[BaseModel]] = None,
+    tools: Optional[list[Any]] = None,
+    tool_choice: Optional[Any] = None,
+    max_round_trips: int = 6,
+):
+    """
+    Stream text, handle function calls in discrete round-trips,
+    and forward outputs back to the model until completion or budget exhausted.
+    """
+
+    # Normalize initial input
+    if isinstance(input, str):
+        input = [{"role": "user", "content": input}]
+
+    # Build kwargs once
+    kwargs = {}
+    if output:
+        # Prefer the explicit response_format for structured output
+        kwargs["text_format"] = output
+    if instructions:
+        kwargs["instructions"] = instructions
+    if tool_choice:
+        kwargs["tool_choice"] = tool_choice
+
+    round_trip = 0
+    function_outputs = []  # carry function outputs between rounds
+
+    while True:
+        round_trip += 1
+        if round_trip > max_round_trips:
+            context.events.emit("error", f"Tool round-trip budget exceeded ({max_round_trips}).")
+            break
+
+        payload = input if round_trip == 1 else function_outputs
+
+        context.events.emit("start", {"round": round_trip})
+
+        tool_calls_this_round = []
+        text_seen = False
+        error_raised = None
+
+        _tools = ToolRegistry.get_tools() if tools is None else tools
+
+        with context.client.responses.stream(
+            model=context.model,
+            input=payload,
+            tools=_tools,
+            previous_response_id=context.response_id if getattr(context, "response_id", None) else None,
+            **kwargs,
+        ) as stream:
+            try:
+                for event in stream:
+                    et = event.type
+
+                    if et == "response.created":
+                        context.response_id = event.response.id
+
+                    elif et == "response.output_text.delta":
+                        text_seen = True
+                        context.events.emit("text", event.delta)
+
+                    elif et == "response.error":
+                        error_raised = event.error
+                        context.events.emit("error", str(error_raised))
+
+                    elif et in ("response.output_item.done", "response.completed"):
+                        # No-op here; we'll inspect the final response below
+                        pass
+
+                # After the stream ends, inspect the final response for function calls
+                final: Response = stream.get_final_response()
+
+                # Collect function calls deterministically from final.output
+                for item in final.output:
+                    if getattr(item, "type", None) == "function_call":
+                        fcall = cast(ResponseFunctionToolCall, item)
+                        try:
+                            tool_result = ToolRegistry.call(fcall.name, fcall.arguments)
+                            tool_calls_this_round.append({
+                                "type": "function_call_output",
+                                "call_id": fcall.call_id,
+                                "output": _serialize_tool_output(tool_result),
+                            })
+                            context.events.emit("tool_call", fcall.name)
+                            context.events.emit("tool_result", {"name": fcall.name, "result": tool_result})
+                        except Exception as e:
+                            context.events.emit("error", f"Tool '{fcall.name}' failed: {e}")
+                            tool_calls_this_round.append({
+                                "type": "function_call_output",
+                                "call_id": fcall.call_id,
+                                "output": _serialize_tool_output({"error": str(e)}),
+                            })
+
+
+                context.events.emit("end", {"round": round_trip, "text_seen": text_seen})
+
+            except Exception as e:
+                context.events.emit("error", f"Stream failed: {e}")
+                break
+
+        if not tool_calls_this_round:
+            # No more function calls requested; we're done
+            break
+
+        # Prepare next round with the outputs of all tool calls
+        function_outputs = tool_calls_this_round
+
+================================================================================
+# File: testing.py
+# Type: Python
+================================================================================
+
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+api_key = os.getenv("AZURE_API_KEY")
+base_url = os.getenv("AZURE_API_ENDPOINT")
+client = OpenAI(api_key=api_key, base_url=base_url, default_query={"api-version": "preview"})
+model = os.getenv("AZURE_MAIN_MODEL_DEPLOYMENT")
+
+resp = client.responses.create(
+    model=str(model),
+    tools=[
+        {
+            "type": "mcp",
+            "server_label": "context7",
+            "server_url": "https://mcp.context7.com/mcp",
+            "require_approval": "never",
+        },
+    ],
+    input="Use the contex7 mcp and tell me what about PydanticAI - the AI Framework",
+)
+
+print(resp.output_text)

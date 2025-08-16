@@ -107,10 +107,8 @@ def _build_model_from_func(func: Callable[..., Any], model_name: str, descriptio
     - Zero-arg functions are supported.
     """
     sig = inspect.signature(func)
-    # include_extras=True preserves Annotated metadata (e.g., Field)
-    hints = get_type_hints(func, include_extras=True)  # type: ignore[arg-type]
+    hints = get_type_hints(func, include_extras=True)  # include_extras preserves Annotated metadata
 
-    # Dict[str, Any] helps Pylance not over-constrain kwargs to create_model
     fields: Dict[str, Any] = {}
     for param in sig.parameters.values():
         if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
@@ -120,7 +118,6 @@ def _build_model_from_func(func: Callable[..., Any], model_name: str, descriptio
         default = param.default if param.default is not inspect._empty else ...
         fields[param.name] = (ann, default)
 
-    # Avoid passing __doc__ to create_model; set it after. __module__ is safe.
     model = create_model(
         model_name,
         __module__=func.__module__,
@@ -129,4 +126,3 @@ def _build_model_from_func(func: Callable[..., Any], model_name: str, descriptio
     model.__doc__ = description or (func.__doc__ or "")
 
     return model
-

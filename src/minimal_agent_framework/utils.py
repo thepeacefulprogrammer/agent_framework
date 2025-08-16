@@ -44,6 +44,10 @@ def call_llm(
     """
     Stream text, handle function calls in discrete round-trips,
     and forward outputs back to the model until completion or budget exhausted.
+
+    Interruptible with Ctrl+C:
+    - On KeyboardInterrupt, sets context.paused = True and context.running = False
+      and returns immediately so the host can open a model console.
     """
 
     # Normalize initial input
@@ -53,7 +57,6 @@ def call_llm(
     # Build kwargs once
     kwargs = {}
     if output:
-        # Prefer the explicit response_format for structured output
         kwargs["text_format"] = output
     if instructions:
         kwargs["instructions"] = instructions
@@ -75,66 +78,78 @@ def call_llm(
 
         tool_calls_this_round = []
         text_seen = False
-        error_raised = None
 
         _tools = ToolRegistry.get_tools() if tools is None else tools
 
-        with context.client.responses.stream(
-            model=context.model,
-            input=payload,
-            tools=_tools,
-            previous_response_id=context.response_id if getattr(context, "response_id", None) else None,
-            **kwargs,
-        ) as stream:
-            try:
-                for event in stream:
-                    et = event.type
+        try:
+            with context.client.responses.stream(
+                model=context.model,
+                input=payload,
+                tools=_tools,
+                previous_response_id=context.response_id if getattr(context, "response_id", None) else None,
+                **kwargs,
+            ) as stream:
+                try:
+                    for event in stream:
+                        et = event.type
 
-                    if et == "response.created":
-                        context.response_id = event.response.id
+                        if et == "response.created":
+                            context.response_id = event.response.id
 
-                    elif et == "response.output_text.delta":
-                        text_seen = True
-                        context.events.emit("text", event.delta)
+                        elif et == "response.output_text.delta":
+                            text_seen = True
+                            context.events.emit("text", event.delta)
 
-                    elif et == "response.error":
-                        error_raised = event.error
-                        context.events.emit("error", str(error_raised))
+                        elif et == "response.error":
+                            context.events.emit("error", str(event.error))
 
-                    elif et in ("response.output_item.done", "response.completed"):
-                        # No-op here; we'll inspect the final response below
+                        elif et in ("response.output_item.done", "response.completed"):
+                            # No-op here; final handled below
+                            pass
+
+                    # After the stream ends, inspect the final response for function calls
+                    final: Response = stream.get_final_response()
+
+                    for item in final.output:
+                        if getattr(item, "type", None) == "function_call":
+                            fcall = cast(ResponseFunctionToolCall, item)
+                            try:
+                                tool_result = ToolRegistry.call(fcall.name, fcall.arguments)
+                                tool_calls_this_round.append({
+                                    "type": "function_call_output",
+                                    "call_id": fcall.call_id,
+                                    "output": _serialize_tool_output(tool_result),
+                                })
+                                context.events.emit("tool_call", fcall.name)
+                                context.events.emit("tool_result", {"name": fcall.name, "result": tool_result})
+                            except Exception as e:
+                                context.events.emit("error", f"Tool '{fcall.name}' failed: {e}")
+                                tool_calls_this_round.append({
+                                    "type": "function_call_output",
+                                    "call_id": fcall.call_id,
+                                    "output": _serialize_tool_output({"error": str(e)}),
+                                })
+
+                    context.events.emit("end", {"round": round_trip, "text_seen": text_seen})
+
+                except KeyboardInterrupt:
+                    try:
+                        stream.close()
+                    except Exception:
                         pass
+                    context.events.emit("error", "Interrupted by user (Ctrl+C). Pausing...")
+                    context.paused = True
+                    context.running = False
+                    return  # leave immediately so host can open console
 
-                # After the stream ends, inspect the final response for function calls
-                final: Response = stream.get_final_response()
-
-                # Collect function calls deterministically from final.output
-                for item in final.output:
-                    if getattr(item, "type", None) == "function_call":
-                        fcall = cast(ResponseFunctionToolCall, item)
-                        try:
-                            tool_result = ToolRegistry.call(fcall.name, fcall.arguments)
-                            tool_calls_this_round.append({
-                                "type": "function_call_output",
-                                "call_id": fcall.call_id,
-                                "output": _serialize_tool_output(tool_result),
-                            })
-                            context.events.emit("tool_call", fcall.name)
-                            context.events.emit("tool_result", {"name": fcall.name, "result": tool_result})
-                        except Exception as e:
-                            context.events.emit("error", f"Tool '{fcall.name}' failed: {e}")
-                            tool_calls_this_round.append({
-                                "type": "function_call_output",
-                                "call_id": fcall.call_id,
-                                "output": _serialize_tool_output({"error": str(e)}),
-                            })
-
-
-                context.events.emit("end", {"round": round_trip, "text_seen": text_seen})
-
-            except Exception as e:
-                context.events.emit("error", f"Stream failed: {e}")
-                break
+        except KeyboardInterrupt:
+            context.events.emit("error", "Interrupted by user (Ctrl+C). Pausing...")
+            context.paused = True
+            context.running = False
+            return
+        except Exception as e:
+            context.events.emit("error", f"Stream failed: {e}")
+            break
 
         if not tool_calls_this_round:
             # No more function calls requested; we're done
